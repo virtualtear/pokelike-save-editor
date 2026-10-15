@@ -170,6 +170,15 @@
     return id;
   }
 
+  const dexNumber = id => `#${String(id).padStart(3, '0')}`;
+
+  // A query like "25" or "#025" matches the Pokédex number, anything else the name
+  function matchesSearch(pokemon, query) {
+    const number = query.trim().match(/^#?(\d+)$/);
+    if (number) return pokemon.id === Number(number[1]);
+    return pokemon.name.toLowerCase().includes(query.trim().toLowerCase());
+  }
+
   // ─── Styles ──────────────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
@@ -417,6 +426,15 @@
       margin-top: 8px;
       color: rgba(235, 235, 245, 0.8);
     }
+    .pse-card-number {
+      font-size: 11px;
+      margin-top: 8px;
+      color: rgba(235, 235, 245, 0.45);
+      font-variant-numeric: tabular-nums;
+    }
+    .pse-card-number + .pse-card-name {
+      margin-top: 2px;
+    }
 
     .pse-modal {
       position: fixed;
@@ -659,14 +677,13 @@
     function renderGroups() {
       const dex = readJson(view.saveKey, {});
       const collapsed = new Set(readJson(prefKey('collapsed_gens'), []));
-      const query = search.value.trim().toLowerCase();
 
       const sections = GENERATIONS
         .filter(g => genSelect.value === 'all' || String(g.gen) === genSelect.value)
         .map(g => {
           const all = POKEMON_LIST.filter(p => p.gen === g.gen);
           const shown = all.filter(p =>
-            p.name.toLowerCase().includes(query) && !(missingOnly.checked && isCaught(dex, p.id))
+            matchesSearch(p, search.value) && !(missingOnly.checked && isCaught(dex, p.id))
           );
           if (shown.length === 0) return '';
 
@@ -686,6 +703,7 @@
                 ${shown.map(p => `
                   <div class="pse-card ${isCaught(dex, p.id) ? 'owned' : ''}" data-id="${p.id}">
                     <img src="${view.spriteBase}${p.id}.png" alt="${p.name}" loading="lazy">
+                    <div class="pse-card-number">${dexNumber(p.id)}</div>
                     <div class="pse-card-name">${p.name}</div>
                   </div>
                 `).join('')}
@@ -944,12 +962,13 @@
 
     function renderPicker(query = '') {
       const filtered = POKEMON_LIST.filter(p =>
-        p.name.toLowerCase().includes(query.toLowerCase())
+        matchesSearch(p, query)
       );
 
       grid.innerHTML = filtered.map(p => `
         <div class="pse-card" data-id="${p.id}">
           <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png" alt="${p.name}">
+          <div class="pse-card-number">${dexNumber(p.id)}</div>
           <div class="pse-card-name">${p.name}</div>
         </div>
       `).join('');
@@ -1222,6 +1241,7 @@
       return `
         <div class="pse-card ${poke.buffs ? 'owned' : ''}" data-id="${poke.id}" style="cursor: pointer;">
           <img src="${poke.spriteUrl}" alt="${poke.name}">
+          <div class="pse-card-number">${dexNumber(poke.id)}</div>
           <div class="pse-card-name">${poke.isShiny ? '✨ ' : ''}${poke.name}</div>
           ${totalBuffs > 0 ? `<div style="font-size: 11px; color: rgba(139, 92, 246, 1); margin-top: 4px;">${totalBuffs} buff points</div>` : ''}
         </div>
