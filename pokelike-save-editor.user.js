@@ -562,6 +562,126 @@
       height: 48px;
       image-rendering: pixelated;
     }
+    .pse-hof-mon {
+      position: relative;
+      display: inline-block;
+    }
+
+    .pse-item-badge {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      font-size: 14px;
+      line-height: 1;
+      cursor: help;
+    }
+    .pse-item-tip {
+      position: fixed;
+      z-index: 10000000;
+      display: flex;
+      flex-direction: column;
+      max-width: 240px;
+      padding: 8px 12px;
+      background: rgba(28, 28, 36, 0.98);
+      border: 0.5px solid rgba(139, 92, 246, 0.4);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+    .pse-item-tip.visible {
+      opacity: 1;
+    }
+    .pse-item-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(235, 235, 245, 0.95);
+    }
+    .pse-item-desc {
+      display: block;
+      margin-top: 2px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: rgba(235, 235, 245, 0.55);
+    }
+    .pse-item-icon {
+      flex-shrink: 0;
+      width: 22px;
+      font-size: 18px;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .pse-item-picker {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 0.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .pse-item-picker .pse-item-name {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .pse-item-arrow {
+      color: rgba(235, 235, 245, 0.5);
+      transition: transform 0.2s;
+    }
+    .pse-item-picker[aria-expanded="true"] .pse-item-arrow {
+      transform: rotate(180deg);
+    }
+    .pse-item-list {
+      position: relative;
+      margin-top: 6px;
+      max-height: 280px;
+      overflow-y: auto;
+      background: rgba(255, 255, 255, 0.02);
+      border: 0.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+    .pse-item-option {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 10px;
+      background: none;
+      border: none;
+      border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+      border-radius: 0;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .pse-item-option:last-child {
+      border-bottom: none;
+    }
+    .pse-item-option:hover,
+    .pse-item-option:focus-visible {
+      background: rgba(255, 255, 255, 0.06);
+      outline: none;
+    }
+    .pse-item-option.selected {
+      background: rgba(139, 92, 246, 0.18);
+    }
+    .pse-item-option.selected::after {
+      content: '✓';
+      color: #a78bfa;
+      font-weight: 600;
+    }
+    .pse-item-text {
+      flex: 1;
+      min-width: 0;
+    }
   `;
   document.head.appendChild(style);
 
@@ -796,6 +916,72 @@
   const teamSpriteUrl = member => `${SPRITE_BASE}${member.isShiny ? 'shiny/' : ''}${member.speciesId}.png`;
   const speciesName = id => POKEMON_BY_ID.get(id)?.name || dexNumber(id);
 
+  // Item texts contain quotes and ampersands, which would break HTML attributes
+  const escapeHtml = text => String(text ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  // Prefer the game's current description over the one stored with an older save
+  const itemInfo = heldItem => getItemList().find(i => i.id === heldItem.id) || heldItem;
+
+  // Item icon on a team sprite. Hovering it shows the item tooltip
+  function heldItemBadge(heldItem) {
+    if (!heldItem) return '';
+    const item = itemInfo(heldItem);
+    return `<span class="pse-item-badge" data-name="${escapeHtml(item.name)}" data-desc="${escapeHtml(item.desc)}">${item.icon}</span>`;
+  }
+
+  // One row of the held item picker. Without an item it is the "None" row
+  function itemOptionHtml(item) {
+    return `
+      <button type="button" class="pse-item-option" data-id="${item ? escapeHtml(item.id) : ''}">
+        <span class="pse-item-icon">${item ? item.icon : ''}</span>
+        <span class="pse-item-text">
+          <span class="pse-item-name">${item ? escapeHtml(item.name) : 'None'}</span>
+          ${item?.desc ? `<span class="pse-item-desc">${escapeHtml(item.desc)}</span>` : ''}
+        </span>
+      </button>
+    `;
+  }
+
+  function teamMemberTile(member, runIdx, teamIdx) {
+    return `
+      <div style="position: relative; cursor: pointer;" onclick="editTeamMember(${runIdx}, ${teamIdx})">
+        <img src="${teamSpriteUrl(member)}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${member.nickname || speciesName(member.speciesId)} Lv.${member.level}${member.isShiny ? ' ✨' : ''}">
+        ${member.isShiny ? '<div style="position: absolute; top: 2px; left: 2px; font-size: 16px;">✨</div>' : ''}
+        ${heldItemBadge(member.heldItem)}
+      </div>
+    `;
+  }
+
+  // One shared tooltip directly in <body>, so the scrolling editor panels cannot clip it.
+  // Its texts are page text, so the game's translator turns them into the player's language
+  const itemTip = document.createElement('div');
+  itemTip.className = 'pse-item-tip';
+  itemTip.innerHTML = '<span class="pse-item-name"></span><span class="pse-item-desc"></span>';
+  document.body.appendChild(itemTip);
+
+  document.addEventListener('mouseover', e => {
+    const badge = e.target.closest?.('.pse-item-badge');
+    if (!badge) return;
+    itemTip.querySelector('.pse-item-name').textContent = badge.dataset.name;
+    itemTip.querySelector('.pse-item-desc').textContent = badge.dataset.desc;
+    const rect = badge.getBoundingClientRect();
+    itemTip.style.left = `${Math.max(8, Math.min(rect.left - 8, window.innerWidth - 260))}px`;
+    // Below the badge, so the Pokémon stays visible. Near the bottom of the screen it
+    // goes above, anchored by its bottom edge so a longer translated text grows upwards
+    if (rect.bottom < window.innerHeight - 120) {
+      itemTip.style.bottom = '';
+      itemTip.style.top = `${rect.bottom + 6}px`;
+    } else {
+      itemTip.style.top = '';
+      itemTip.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+    }
+    itemTip.classList.add('visible');
+  });
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest?.('.pse-item-badge')) itemTip.classList.remove('visible');
+  });
+
   function renderHallOfFame(container) {
     const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
 
@@ -826,7 +1012,7 @@
             <button class="pse-btn pse-btn-danger pse-btn-sm" onclick="deleteHofRun(${idx})">Delete</button>
           </div>
           <div class="pse-hof-team">
-            ${run.team.map(p => `<img src="${teamSpriteUrl(p)}" alt="${speciesName(p.speciesId)}" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}">`).join('')}
+            ${run.team.map(p => `<span class="pse-hof-mon"><img src="${teamSpriteUrl(p)}" alt="${speciesName(p.speciesId)}" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}">${heldItemBadge(p.heldItem)}</span>`).join('')}
           </div>
         </div>
       `;
@@ -907,13 +1093,7 @@
         <div style="margin-bottom: 16px;">
           <div style="font-size: 13px; margin-bottom: 8px; color: rgba(235, 235, 245, 0.7);">Team (${run.team.length}/6)</div>
           <div id="pse-team-list" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-            ${run.team.map((p, i) => `
-              <div style="position: relative; cursor: pointer;" onclick="editTeamMember(${idx}, ${i})">
-                <img src="${teamSpriteUrl(p)}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}${p.isShiny ? ' ✨' : ''}${p.heldItem ? ' • ' + p.heldItem.icon : ''}">
-                ${p.isShiny ? '<div style="position: absolute; top: 2px; left: 2px; font-size: 16px;">✨</div>' : ''}
-                ${p.heldItem ? `<div style="position: absolute; bottom: 2px; right: 2px; font-size: 14px;">${p.heldItem.icon}</div>` : ''}
-              </div>
-            `).join('')}
+            ${run.team.map((p, i) => teamMemberTile(p, idx, i)).join('')}
           </div>
           <button class="pse-btn pse-btn-secondary" id="pse-add-team">+ Add Pokémon</button>
         </div>
@@ -1058,13 +1238,7 @@
 
     const teamList = document.getElementById('pse-team-list');
     if (teamList) {
-      teamList.innerHTML = run.team.map((p, i) => `
-        <div style="position: relative; cursor: pointer;" onclick="editTeamMember(${runIdx}, ${i})">
-          <img src="${teamSpriteUrl(p)}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}${p.isShiny ? ' ✨' : ''}${p.heldItem ? ' • ' + p.heldItem.icon : ''}">
-          ${p.isShiny ? '<div style="position: absolute; top: 2px; left: 2px; font-size: 16px;">✨</div>' : ''}
-          ${p.heldItem ? `<div style="position: absolute; bottom: 2px; right: 2px; font-size: 14px;">${p.heldItem.icon}</div>` : ''}
-        </div>
-      `).join('');
+      teamList.innerHTML = run.team.map((p, i) => teamMemberTile(p, runIdx, i)).join('');
 
       // Update team count
       const teamCountLabel = teamList.previousElementSibling;
@@ -1109,15 +1283,11 @@
         </div>
 
         <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Held Item</label>
-          <select id="pse-held-item" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #000; font-size: 14px; cursor: pointer;">
-            <option value="">None</option>
-            ${itemChoices.map(item => `
-              <option value="${item.id}" ${member.heldItem?.id === item.id ? 'selected' : ''}>
-                ${item.icon} ${item.name}
-              </option>
-            `).join('')}
-          </select>
+          <label for="pse-held-item" style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Held Item</label>
+          <button type="button" class="pse-item-picker" id="pse-held-item" aria-expanded="false" aria-controls="pse-item-list"></button>
+          <div class="pse-item-list" id="pse-item-list" hidden>
+            ${[null, ...itemChoices].map(itemOptionHtml).join('')}
+          </div>
         </div>
 
         <div class="pse-modal-actions">
@@ -1129,13 +1299,47 @@
     `;
     document.body.appendChild(modal);
 
+    let selectedItemId = member.heldItem?.id || '';
+    const itemPicker = modal.querySelector('#pse-held-item');
+    const itemList = modal.querySelector('#pse-item-list');
+    const showSelectedItem = () => {
+      const item = itemChoices.find(i => i.id === selectedItemId);
+      itemPicker.innerHTML = `
+        <span class="pse-item-icon">${item ? item.icon : ''}</span>
+        <span class="pse-item-name">${item ? escapeHtml(item.name) : 'None'}</span>
+        <span class="pse-item-arrow">▾</span>
+      `;
+      itemList.querySelectorAll('.pse-item-option').forEach(option => {
+        option.classList.toggle('selected', option.dataset.id === selectedItemId);
+      });
+    };
+    const setItemListOpen = open => {
+      itemList.hidden = !open;
+      itemPicker.setAttribute('aria-expanded', String(open));
+      if (!open) return;
+      itemList.scrollIntoView({ block: 'nearest' });
+      // Center the current item inside the list without scrolling the modal again
+      const selected = itemList.querySelector('.selected');
+      if (selected) itemList.scrollTop = selected.offsetTop - (itemList.clientHeight - selected.offsetHeight) / 2;
+    };
+    showSelectedItem();
+    itemPicker.addEventListener('click', () => setItemListOpen(itemList.hidden));
+    itemList.addEventListener('click', e => {
+      const option = e.target.closest('.pse-item-option');
+      if (!option) return;
+      selectedItemId = option.dataset.id;
+      showSelectedItem();
+      setItemListOpen(false);
+      itemPicker.focus();
+    });
+
     modal.querySelector('#pse-cancel-member').addEventListener('click', () => modal.remove());
 
     modal.querySelector('#pse-save-member').addEventListener('click', () => {
       const nickname = document.getElementById('pse-nickname').value.trim();
       const level = parseInt(document.getElementById('pse-level').value);
       const isShiny = document.getElementById('pse-is-shiny').checked;
-      const itemId = document.getElementById('pse-held-item').value;
+      const itemId = selectedItemId;
 
       // Reload from localStorage to ensure we have the latest data
       const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
