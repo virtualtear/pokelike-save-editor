@@ -172,11 +172,22 @@
 
   const dexNumber = id => `#${String(id).padStart(3, '0')}`;
 
+  // The game translates English Pokémon names on the page into its own language
+  // (German, French), so search has to match that translated name as well
+  function shownName(pokemon) {
+    try {
+      return window.POKE_I18N?.pokeName?.(pokemon.name) || pokemon.name;
+    } catch {
+      return pokemon.name;
+    }
+  }
+
   // A query like "25" or "#025" matches the Pokédex number, anything else the name
   function matchesSearch(pokemon, query) {
     const number = query.trim().match(/^#?(\d+)$/);
     if (number) return pokemon.id === Number(number[1]);
-    return pokemon.name.toLowerCase().includes(query.trim().toLowerCase());
+    const text = query.trim().toLowerCase();
+    return pokemon.name.toLowerCase().includes(text) || shownName(pokemon).toLowerCase().includes(text);
   }
 
   // ─── Styles ──────────────────────────────────────────────────────────────────
