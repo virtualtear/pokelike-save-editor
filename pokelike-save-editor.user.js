@@ -19,10 +19,34 @@
   // ─── State ───────────────────────────────────────────────────────────────────
   const STATE = {
     currentView: 'pokedex',
-    searchQuery: '',
-    editingHofIndex: null,
-    editingTeamIndex: null,
   };
+
+  // ─── Save Data ───────────────────────────────────────────────────────────────
+  const HOF_KEY = 'poke_hall_of_fame';
+  const BUFFS_KEY = 'poke_stat_buffs';
+
+  function readJson(key, fallback) {
+    try {
+      return JSON.parse(localStorage.getItem(key)) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  const writeJson = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+
+  // The game keeps lists like ITEM_POOL and ACHIEVEMENTS as top-level consts in its
+  // scripts: code running in the page reaches them by name, but they are not window
+  // properties. Reading one that does not exist throws, so the catch covers that too
+  function readGameList(read, fallback) {
+    try {
+      const list = read();
+      if (Array.isArray(list) && list.length) return list;
+    } catch {
+      // Not reachable from where this script runs
+    }
+    return fallback;
+  }
 
   // ─── Items ───────────────────────────────────────────────────────────────────
   // Pokelike gives items its own effects, so they come from the game, not from PokeAPI.
@@ -69,18 +93,8 @@
     { id: 'loaded_dice', name: 'Loaded Dice', icon: '🎲', desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1', iconUrl: 'https://api.pokelike2.xyz/sprites/items/loaded_dice.png', gen2Only: true },
   ];
 
-  // Held items the game can hand out. ITEM_POOL is a top-level const in the
-  // game's scripts, reachable by name like ACHIEVEMENTS
-  function getItemList() {
-    try {
-      if (typeof ITEM_POOL !== 'undefined' && Array.isArray(ITEM_POOL) && ITEM_POOL.length) {
-        return ITEM_POOL;
-      }
-    } catch {
-      // Not reachable from where this script runs
-    }
-    return BUILTIN_ITEMS;
-  }
+  // Held items the game can hand out
+  const getItemList = () => readGameList(() => ITEM_POOL, BUILTIN_ITEMS);
 
   // ─── Pokémon Data (PokeAPI) ──────────────────────────────────────────────────
   // The game's Pokédex stops at #809, the end of Gen 7
@@ -88,6 +102,7 @@
   const POKEAPI_URL = 'https://graphql.pokeapi.co/v1beta2';
   const POKEAPI_CACHE_KEY = 'pse_pokeapi_cache';
   const POKEAPI_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+  const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
   const POKEAPI_QUERY = `{
     pokemonspecies(where: {id: {_lte: ${MAX_POKEMON_ID}}}, order_by: {id: asc}) {
       id name generation_id evolves_from_species_id is_legendary is_mythical
@@ -143,12 +158,8 @@
   }
 
   function readPokemonCache() {
-    try {
-      const cache = JSON.parse(localStorage.getItem(POKEAPI_CACHE_KEY));
-      return Array.isArray(cache?.pokemon) && cache.pokemon.length ? cache : null;
-    } catch {
-      return null;
-    }
+    const cache = readJson(POKEAPI_CACHE_KEY, null);
+    return Array.isArray(cache?.pokemon) && cache.pokemon.length ? cache : null;
   }
 
   // Resolves once POKEMON_LIST is filled, from the cache or from PokeAPI
@@ -165,7 +176,7 @@
     pokemonDataRequest = fetchPokemonData().then(list => {
       applyPokemonData(list);
       try {
-        localStorage.setItem(POKEAPI_CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), pokemon: list }));
+        writeJson(POKEAPI_CACHE_KEY, { fetchedAt: Date.now(), pokemon: list });
       } catch {
         // Storage full: the data still works for this visit
       }
@@ -181,7 +192,6 @@
     return pokemonDataRequest;
   }
 
-  // Get the base form (evolution line root) for any Pokemon ID
   function getEvoLineRoot(speciesId) {
     let id = speciesId;
     while (POKEMON_BY_ID.get(id)?.evolvesFrom) id = POKEMON_BY_ID.get(id).evolvesFrom;
@@ -189,6 +199,8 @@
   }
 
   const dexNumber = id => `#${String(id).padStart(3, '0')}`;
+  const speciesName = id => POKEMON_BY_ID.get(id)?.name || dexNumber(id);
+  const spriteUrl = (id, shiny = false) => `${SPRITE_BASE}${shiny ? 'shiny/' : ''}${id}.png`;
 
   // The game translates English Pokémon names on the page into its own language
   // (German, French), so search has to match that translated name as well
@@ -422,6 +434,7 @@
     .pse-loading,
     .pse-error,
     .pse-empty {
+      grid-column: 1 / -1;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -682,6 +695,170 @@
       flex: 1;
       min-width: 0;
     }
+
+    .pse-field {
+      margin-bottom: 16px;
+    }
+    .pse-label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: rgba(235, 235, 245, 0.7);
+    }
+    .pse-input {
+      width: 100%;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 0.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: rgba(235, 235, 245, 0.9);
+      font-size: 14px;
+    }
+    .pse-checkbox input {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: rgba(139, 92, 246, 1);
+    }
+    .pse-checkbox-danger {
+      font-size: 11px;
+      color: rgba(255, 100, 100, 1);
+    }
+    .pse-checkbox-danger input {
+      accent-color: rgba(255, 100, 100, 1);
+    }
+    .pse-sprite-lg {
+      display: block;
+      width: 96px;
+      height: 96px;
+      margin: 0 auto 20px;
+      image-rendering: pixelated;
+    }
+
+    .pse-team-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .pse-team-tile {
+      position: relative;
+      cursor: pointer;
+    }
+    .pse-team-tile img {
+      width: 64px;
+      height: 64px;
+      image-rendering: pixelated;
+    }
+    .pse-shiny-mark {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      font-size: 16px;
+    }
+
+    .pse-info-box {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(139, 92, 246, 0.1);
+      border: 0.5px solid rgba(139, 92, 246, 0.3);
+      border-radius: 8px;
+    }
+    .pse-info-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .pse-hint {
+      margin-top: 4px;
+      font-size: 11px;
+      color: rgba(235, 235, 245, 0.6);
+    }
+    .pse-hint-warn {
+      color: rgba(255, 180, 0, 0.8);
+    }
+    .pse-hint-danger {
+      color: rgba(255, 100, 100, 0.8);
+    }
+    .pse-buff-points {
+      margin-top: 4px;
+      font-size: 11px;
+      color: rgba(139, 92, 246, 1);
+    }
+    .pse-buff-used {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(235, 235, 245, 0.9);
+    }
+    #pse-buff-total.full {
+      color: rgba(255, 215, 0, 1);
+    }
+    #pse-buff-total.over {
+      color: rgba(255, 100, 100, 1);
+    }
+    .pse-buff-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pse-buff-row input[type="range"] {
+      flex: 1;
+      accent-color: rgba(139, 92, 246, 1);
+    }
+    .pse-buff-row .pse-input {
+      width: 60px;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .pse-ach-grid {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+    .pse-achievement-card {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 0.5px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      text-align: center;
+      opacity: 0.5;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .pse-achievement-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    }
+    .pse-achievement-card.unlocked {
+      background: rgba(139, 92, 246, 0.1);
+      border-color: rgba(139, 92, 246, 0.3);
+      opacity: 1;
+    }
+    .pse-ach-icon {
+      margin-bottom: 8px;
+      font-size: 32px;
+    }
+    .pse-ach-name {
+      margin-bottom: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(235, 235, 245, 0.7);
+    }
+    .pse-achievement-card.unlocked .pse-ach-name {
+      color: rgba(139, 92, 246, 1);
+    }
+    .pse-ach-desc {
+      font-size: 11px;
+      line-height: 1.4;
+      color: rgba(235, 235, 245, 0.5);
+    }
+    .pse-ach-check {
+      margin-top: 8px;
+      font-size: 16px;
+    }
   `;
   document.head.appendChild(style);
 
@@ -694,7 +871,7 @@
       <div class="pse-title">Save Editor - by neol1no, continued by virtualtear</div>
       <div style="display: flex; gap: 8px; align-items: center;">
         <button class="pse-btn pse-btn-primary" id="pse-save-reload" style="padding: 8px 16px; font-size: 12px;">Save & Reload</button>
-        <button class="pse-close" onclick="document.getElementById('pse-gui').classList.add('hidden')">✕</button>
+        <button class="pse-close">✕</button>
       </div>
     </div>
     <div class="pse-nav">
@@ -708,20 +885,31 @@
     <div class="pse-content" id="pse-content"></div>
   `;
   document.body.appendChild(gui);
+  gui.querySelector('.pse-close').addEventListener('click', () => gui.classList.add('hidden'));
+
+  function toggleGui() {
+    gui.classList.toggle('hidden');
+    if (!gui.classList.contains('hidden')) renderContent();
+  }
+
+  function openModal(html) {
+    const modal = document.createElement('div');
+    modal.className = 'pse-modal';
+    modal.innerHTML = `<div class="pse-modal-box">${html}</div>`;
+    modal.addEventListener('click', e => {
+      if (e.target === modal) modal.remove();
+    });
+    document.body.appendChild(modal);
+    return modal;
+  }
 
   // ─── Toggle Button ───────────────────────────────────────────────────────────
   const toggleBtn = document.createElement('div');
   toggleBtn.id = 'pse-toggle-btn';
-  toggleBtn.innerHTML = '⚙️';
+  toggleBtn.textContent = '⚙️';
   toggleBtn.title = 'Toggle Save Editor (Ctrl+Shift+E)';
+  toggleBtn.addEventListener('click', toggleGui);
   document.body.appendChild(toggleBtn);
-
-  toggleBtn.addEventListener('click', () => {
-    gui.classList.toggle('hidden');
-    if (!gui.classList.contains('hidden')) {
-      renderContent();
-    }
-  });
 
   // ─── Navigation ──────────────────────────────────────────────────────────────
   document.querySelectorAll('.pse-nav-btn').forEach(btn => {
@@ -736,6 +924,15 @@
   // ─── Render Content ──────────────────────────────────────────────────────────
   const VIEWS_NEEDING_POKEMON = new Set(['pokedex', 'shiny-dex', 'hall-of-fame', 'stat-buffs']);
 
+  const VIEW_RENDERERS = {
+    'pokedex': container => renderDex(container, DEX_VIEWS.pokedex),
+    'shiny-dex': container => renderDex(container, DEX_VIEWS['shiny-dex']),
+    'hall-of-fame': renderHallOfFame,
+    'stat-buffs': renderStatBuffs,
+    'achievements': renderAchievements,
+    'settings': renderSettings,
+  };
+
   function renderContent() {
     const content = document.getElementById('pse-content');
 
@@ -744,19 +941,7 @@
       return;
     }
 
-    if (STATE.currentView === 'pokedex') {
-      renderDex(content, DEX_VIEWS.pokedex);
-    } else if (STATE.currentView === 'shiny-dex') {
-      renderDex(content, DEX_VIEWS['shiny-dex']);
-    } else if (STATE.currentView === 'hall-of-fame') {
-      renderHallOfFame(content);
-    } else if (STATE.currentView === 'stat-buffs') {
-      renderStatBuffs(content);
-    } else if (STATE.currentView === 'achievements') {
-      renderAchievements(content);
-    } else if (STATE.currentView === 'settings') {
-      renderSettings(content);
-    }
+    VIEW_RENDERERS[STATE.currentView](content);
   }
 
   function renderPokemonDataLoading(container) {
@@ -778,20 +963,10 @@
   }
 
   // ─── Pokédex & Shiny Dex ─────────────────────────────────────────────────────
-  const SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
-
   const DEX_VIEWS = {
-    'pokedex': { id: 'pokedex', saveKey: 'poke_dex', spriteBase: SPRITE_BASE },
-    'shiny-dex': { id: 'shiny-dex', saveKey: 'poke_shiny_dex', spriteBase: `${SPRITE_BASE}shiny/` },
+    'pokedex': { id: 'pokedex', saveKey: 'poke_dex', shiny: false },
+    'shiny-dex': { id: 'shiny-dex', saveKey: 'poke_shiny_dex', shiny: true },
   };
-
-  function readJson(key, fallback) {
-    try {
-      return JSON.parse(localStorage.getItem(key)) ?? fallback;
-    } catch {
-      return fallback;
-    }
-  }
 
   // The game saves caught Pokémon as { "25": 1 } and turns any older entry into 1
   // when it loads, so every entry that exists counts as caught.
@@ -824,7 +999,7 @@
     missingOnly.checked = localStorage.getItem(prefKey('missing_only')) === 'true';
 
     function saveDex(dex) {
-      localStorage.setItem(view.saveKey, JSON.stringify(dex));
+      writeJson(view.saveKey, dex);
       renderGroups();
     }
 
@@ -856,7 +1031,7 @@
               <div class="pse-grid">
                 ${shown.map(p => `
                   <div class="pse-card ${isCaught(dex, p.id) ? 'owned' : ''}" data-id="${p.id}">
-                    <img src="${view.spriteBase}${p.id}.png" alt="${p.name}" loading="lazy">
+                    <img src="${spriteUrl(p.id, view.shiny)}" alt="${p.name}" loading="lazy">
                     <div class="pse-card-number">${dexNumber(p.id)}</div>
                     <div class="pse-card-name">${p.name}</div>
                   </div>
@@ -893,7 +1068,7 @@
         const collapsed = new Set(readJson(prefKey('collapsed_gens'), []));
         if (collapsed.has(gen)) collapsed.delete(gen);
         else collapsed.add(gen);
-        localStorage.setItem(prefKey('collapsed_gens'), JSON.stringify([...collapsed]));
+        writeJson(prefKey('collapsed_gens'), [...collapsed]);
         section.classList.toggle('collapsed');
       }
     });
@@ -911,10 +1086,14 @@
     renderGroups();
   }
 
+  // ─── Hall of Fame ────────────────────────────────────────────────────────────
+  const MAX_TEAM_SIZE = 6;
+  const TOWER_REGIONS = GENERATIONS.slice(0, 5).map(g => g.region);
+
   // The game trims saved team members to speciesId, level, nickname, isShiny
   // and heldItem, so sprites and names have to come from the species
-  const teamSpriteUrl = member => `${SPRITE_BASE}${member.isShiny ? 'shiny/' : ''}${member.speciesId}.png`;
-  const speciesName = id => POKEMON_BY_ID.get(id)?.name || dexNumber(id);
+  const teamSpriteUrl = member => spriteUrl(member.speciesId, member.isShiny);
+  const memberTitle = member => `${member.nickname || speciesName(member.speciesId)} Lv.${member.level}`;
 
   // Item texts contain quotes and ampersands, which would break HTML attributes
   const escapeHtml = text => String(text ?? '')
@@ -943,15 +1122,17 @@
     `;
   }
 
-  function teamMemberTile(member, runIdx, teamIdx) {
+  function teamMemberTile(member, teamIdx) {
     return `
-      <div style="position: relative; cursor: pointer;" onclick="editTeamMember(${runIdx}, ${teamIdx})">
-        <img src="${teamSpriteUrl(member)}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${member.nickname || speciesName(member.speciesId)} Lv.${member.level}${member.isShiny ? ' ✨' : ''}">
-        ${member.isShiny ? '<div style="position: absolute; top: 2px; left: 2px; font-size: 16px;">✨</div>' : ''}
+      <div class="pse-team-tile" data-team-idx="${teamIdx}">
+        <img src="${teamSpriteUrl(member)}" title="${memberTitle(member)}${member.isShiny ? ' ✨' : ''}">
+        ${member.isShiny ? '<div class="pse-shiny-mark">✨</div>' : ''}
         ${heldItemBadge(member.heldItem)}
       </div>
     `;
   }
+
+  const teamTiles = team => team.map(teamMemberTile).join('');
 
   // One shared tooltip directly in <body>, so the scrolling editor panels cannot clip it.
   // Its texts are page text, so the game's translator turns them into the player's language
@@ -982,322 +1163,225 @@
     if (e.target.closest?.('.pse-item-badge')) itemTip.classList.remove('visible');
   });
 
+  function runModeText(run) {
+    const mode = run.endless
+      ? `Battle Tower - ${TOWER_REGIONS[(run.stageNumber || 1) - 1] || 'Unknown'}`
+      : 'Championship';
+    return run.hardMode ? `${mode} (Nuzlocke)` : mode;
+  }
+
   function renderHallOfFame(container) {
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
+    const hof = readJson(HOF_KEY, []);
 
     container.innerHTML = `
       <button class="pse-btn pse-btn-primary" id="pse-add-hof" style="margin-bottom: 16px;">+ Add New Run</button>
-      <div id="pse-hof-list"></div>
+      <div id="pse-hof-list">
+        ${hof.map((run, idx) => `
+          <div class="pse-hof-item" data-idx="${idx}">
+            <div class="pse-hof-header">
+              <div class="pse-hof-title">Run #${run.runNumber} - ${run.date} - ${runModeText(run)}</div>
+              <button class="pse-btn pse-btn-danger pse-btn-sm pse-hof-delete">Delete</button>
+            </div>
+            <div class="pse-hof-team">
+              ${run.team.map(p => `<span class="pse-hof-mon"><img src="${teamSpriteUrl(p)}" alt="${speciesName(p.speciesId)}" title="${memberTitle(p)}">${heldItemBadge(p.heldItem)}</span>`).join('')}
+            </div>
+          </div>
+        `).reverse().join('')}
+      </div>
     `;
 
-    const list = document.getElementById('pse-hof-list');
-    // Reverse to show newest first
-    const reversed = [...hof].reverse();
-    list.innerHTML = reversed.map((run, reversedIdx) => {
-      const idx = hof.length - 1 - reversedIdx; // Get original index
-      let modeText = '';
-      if (run.endless) {
-        const regions = ['Kanto', 'Johto', 'Hoenn', 'Sinnoh', 'Unova'];
-        const region = regions[(run.stageNumber || 1) - 1] || 'Unknown';
-        modeText = `Battle Tower - ${region}`;
-      } else {
-        modeText = 'Championship';
-      }
-      if (run.hardMode) modeText += ' (Nuzlocke)';
-
-      return `
-        <div class="pse-hof-item" data-idx="${idx}">
-          <div class="pse-hof-header">
-            <div class="pse-hof-title">Run #${run.runNumber} - ${run.date} - ${modeText}</div>
-            <button class="pse-btn pse-btn-danger pse-btn-sm" onclick="deleteHofRun(${idx})">Delete</button>
-          </div>
-          <div class="pse-hof-team">
-            ${run.team.map(p => `<span class="pse-hof-mon"><img src="${teamSpriteUrl(p)}" alt="${speciesName(p.speciesId)}" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}">${heldItemBadge(p.heldItem)}</span>`).join('')}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    list.querySelectorAll('.pse-hof-item').forEach(item => {
-      item.addEventListener('click', e => {
-        if (!e.target.classList.contains('pse-btn-danger')) {
-          editHofRun(parseInt(item.dataset.idx));
-        }
-      });
-    });
-
-    document.getElementById('pse-add-hof').addEventListener('click', () => {
-      addNewHofRun();
+    container.querySelector('#pse-add-hof').addEventListener('click', addNewHofRun);
+    container.querySelector('#pse-hof-list').addEventListener('click', e => {
+      const item = e.target.closest('.pse-hof-item');
+      if (!item) return;
+      const idx = Number(item.dataset.idx);
+      if (e.target.closest('.pse-hof-delete')) deleteHofRun(idx);
+      else editHofRun(idx);
     });
   }
 
-  window.deleteHofRun = function(idx) {
-    if (!confirm('Are you sure you want to delete this Hall of Fame entry?')) {
-      return;
-    }
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
+  function deleteHofRun(idx) {
+    if (!confirm('Are you sure you want to delete this Hall of Fame entry?')) return;
+    const hof = readJson(HOF_KEY, []);
     hof.splice(idx, 1);
-    localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));
-    // Sync to cloud immediately to prevent cloud from restoring deleted entry
+    writeJson(HOF_KEY, hof);
+    // Without an immediate sync, the cloud save brings the deleted run back
     if (typeof syncToCloud === 'function') syncToCloud();
-    // Force immediate re-render
     renderContent();
-  };
+  }
 
   function addNewHofRun() {
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    const newRun = {
+    const hof = readJson(HOF_KEY, []);
+    hof.push({
       runNumber: hof.length + 1,
       hardMode: false,
       endless: false,
       date: new Date().toLocaleDateString(),
-      team: []
-    };
-    hof.push(newRun);
-    localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));
+      team: [],
+    });
+    writeJson(HOF_KEY, hof);
     editHofRun(hof.length - 1);
   }
 
   function editHofRun(idx) {
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    const run = hof[idx];
+    const run = readJson(HOF_KEY, [])[idx];
 
-    const modal = document.createElement('div');
-    modal.className = 'pse-modal';
-    modal.innerHTML = `
-      <div class="pse-modal-box">
-        <div class="pse-modal-title">Edit Run #${run.runNumber}</div>
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">
-            <input type="radio" name="pse-mode" value="championship" ${!run.endless ? 'checked' : ''}> Championship
-          </label>
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">
-            <input type="radio" name="pse-mode" value="battle-tower" ${run.endless ? 'checked' : ''}> Battle Tower
-          </label>
-          <div id="pse-region-select" style="margin-left: 24px; margin-top: 8px; ${run.endless ? '' : 'display: none;'}">
-            <label style="display: block; margin-bottom: 4px; font-size: 12px; color: rgba(235, 235, 245, 0.6);">Region:</label>
-            <select id="pse-stage" style="padding: 6px 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: #000; font-size: 13px; cursor: pointer;">
-              <option value="1" ${run.stageNumber === 1 ? 'selected' : ''}>Kanto</option>
-              <option value="2" ${run.stageNumber === 2 ? 'selected' : ''}>Johto</option>
-              <option value="3" ${run.stageNumber === 3 ? 'selected' : ''}>Hoenn</option>
-              <option value="4" ${run.stageNumber === 4 ? 'selected' : ''}>Sinnoh</option>
-              <option value="5" ${run.stageNumber === 5 ? 'selected' : ''}>Unova</option>
-            </select>
-          </div>
-        </div>
-        <div id="pse-nuzlocke-container" style="margin-bottom: 16px; ${run.endless ? 'display: none;' : ''}">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">
-            <input type="checkbox" id="pse-nuzlocke" ${run.hardMode ? 'checked' : ''}> Nuzlocke Mode
-          </label>
-        </div>
-        <div style="margin-bottom: 16px;">
-          <div style="font-size: 13px; margin-bottom: 8px; color: rgba(235, 235, 245, 0.7);">Team (${run.team.length}/6)</div>
-          <div id="pse-team-list" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-            ${run.team.map((p, i) => teamMemberTile(p, idx, i)).join('')}
-          </div>
-          <button class="pse-btn pse-btn-secondary" id="pse-add-team">+ Add Pokémon</button>
-        </div>
-        <div class="pse-modal-actions">
-          <button class="pse-btn pse-btn-secondary" id="pse-cancel">Cancel</button>
-          <button class="pse-btn pse-btn-primary" id="pse-save">Save</button>
+    const modal = openModal(`
+      <div class="pse-modal-title">Edit Run #${run.runNumber}</div>
+      <div class="pse-field">
+        <label class="pse-label">
+          <input type="radio" name="pse-mode" value="championship" ${run.endless ? '' : 'checked'}> Championship
+        </label>
+        <label class="pse-label">
+          <input type="radio" name="pse-mode" value="battle-tower" ${run.endless ? 'checked' : ''}> Battle Tower
+        </label>
+        <div id="pse-region-select" style="margin: 8px 0 0 24px;" ${run.endless ? '' : 'hidden'}>
+          <label class="pse-label" for="pse-stage">Region:</label>
+          <select class="pse-select" id="pse-stage">
+            ${TOWER_REGIONS.map((region, i) => `<option value="${i + 1}" ${run.stageNumber === i + 1 ? 'selected' : ''}>${region}</option>`).join('')}
+          </select>
         </div>
       </div>
-    `;
-    document.body.appendChild(modal);
+      <div class="pse-field" id="pse-nuzlocke-container" ${run.endless ? 'hidden' : ''}>
+        <label class="pse-label">
+          <input type="checkbox" id="pse-nuzlocke" ${run.hardMode ? 'checked' : ''}> Nuzlocke Mode
+        </label>
+      </div>
+      <div class="pse-field">
+        <div class="pse-label" id="pse-team-count">Team (${run.team.length}/${MAX_TEAM_SIZE})</div>
+        <div class="pse-team-list" id="pse-team-list">${teamTiles(run.team)}</div>
+        <button class="pse-btn pse-btn-secondary" id="pse-add-team">+ Add Pokémon</button>
+      </div>
+      <div class="pse-modal-actions">
+        <button class="pse-btn pse-btn-secondary" id="pse-cancel">Cancel</button>
+        <button class="pse-btn pse-btn-primary" id="pse-save">Save</button>
+      </div>
+    `);
 
-    // Toggle region select and nuzlocke visibility
-    const modeRadios = modal.querySelectorAll('input[name="pse-mode"]');
-    const regionSelect = document.getElementById('pse-region-select');
-    const nuzlockeContainer = document.getElementById('pse-nuzlocke-container');
-    modeRadios.forEach(radio => {
+    const regionSelect = modal.querySelector('#pse-region-select');
+    const nuzlockeContainer = modal.querySelector('#pse-nuzlocke-container');
+    modal.querySelectorAll('input[name="pse-mode"]').forEach(radio => {
       radio.addEventListener('change', () => {
         const isBattleTower = radio.value === 'battle-tower';
-        regionSelect.style.display = isBattleTower ? 'block' : 'none';
-        nuzlockeContainer.style.display = isBattleTower ? 'none' : 'block';
+        regionSelect.hidden = !isBattleTower;
+        nuzlockeContainer.hidden = isBattleTower;
       });
     });
 
-    modal.querySelector('#pse-cancel').addEventListener('click', () => modal.remove());
-    modal.querySelector('#pse-save').addEventListener('click', () => {
-      // Reload from localStorage to get the latest data (in case team was modified)
-      const latestHof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-      const latestRun = latestHof[idx];
-
-      const mode = modal.querySelector('input[name="pse-mode"]:checked').value;
-      latestRun.endless = mode === 'battle-tower';
-
-      if (latestRun.endless) {
-        latestRun.stageNumber = parseInt(document.getElementById('pse-stage').value);
-        latestRun.hardMode = false; // Battle Tower can't be Nuzlocke
-      } else {
-        latestRun.hardMode = document.getElementById('pse-nuzlocke').checked;
-        delete latestRun.stageNumber;
-      }
-
-      localStorage.setItem('poke_hall_of_fame', JSON.stringify(latestHof));
-      modal.remove();
-      renderContent();
+    modal.querySelector('#pse-team-list').addEventListener('click', e => {
+      const tile = e.target.closest('.pse-team-tile');
+      if (tile) editTeamMember(idx, Number(tile.dataset.teamIdx));
     });
 
     modal.querySelector('#pse-add-team').addEventListener('click', () => {
-      if (run.team.length >= 6) {
-        alert('Team is full (6/6)');
+      if (run.team.length >= MAX_TEAM_SIZE) {
+        alert(`Team is full (${MAX_TEAM_SIZE}/${MAX_TEAM_SIZE})`);
         return;
       }
       showPokemonPicker(idx);
     });
 
-    modal.addEventListener('click', e => {
-      if (e.target === modal) modal.remove();
+    modal.querySelector('#pse-cancel').addEventListener('click', () => modal.remove());
+    modal.querySelector('#pse-save').addEventListener('click', () => {
+      // Team changes are saved on their own while this modal is open, so start from the stored run
+      const hof = readJson(HOF_KEY, []);
+      const saved = hof[idx];
+      saved.endless = modal.querySelector('input[name="pse-mode"]:checked').value === 'battle-tower';
+      if (saved.endless) {
+        saved.stageNumber = Number(modal.querySelector('#pse-stage').value);
+        saved.hardMode = false; // Battle Tower has no Nuzlocke mode
+      } else {
+        saved.hardMode = modal.querySelector('#pse-nuzlocke').checked;
+        delete saved.stageNumber;
+      }
+      writeJson(HOF_KEY, hof);
+      modal.remove();
+      renderContent();
     });
   }
 
-  window.removeTeamMember = function(runIdx, teamIdx) {
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    hof[runIdx].team.splice(teamIdx, 1);
-    localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));
-    document.querySelector('.pse-modal').remove();
-    editHofRun(runIdx);
-  };
-
-  window.editTeamMember = function(runIdx, teamIdx) {
-    editTeamMember(runIdx, teamIdx);
-  };
-
   function showPokemonPicker(runIdx) {
-    const modal = document.createElement('div');
-    modal.className = 'pse-modal';
-    modal.innerHTML = `
-      <div class="pse-modal-box">
-        <div class="pse-modal-title">Add Pokémon to Team</div>
-        <input type="text" class="pse-search" placeholder="Search Pokémon..." id="pse-search-picker">
-        <div class="pse-grid" id="pse-picker-grid" style="max-height: 400px; overflow-y: auto;"></div>
-      </div>
-    `;
-    document.body.appendChild(modal);
-
-    const grid = document.getElementById('pse-picker-grid');
-    const search = document.getElementById('pse-search-picker');
+    const modal = openModal(`
+      <div class="pse-modal-title">Add Pokémon to Team</div>
+      <input type="text" class="pse-search" placeholder="Search Pokémon..." id="pse-search-picker">
+      <div class="pse-grid" id="pse-picker-grid" style="max-height: 400px; overflow-y: auto;"></div>
+    `);
+    const grid = modal.querySelector('#pse-picker-grid');
 
     function renderPicker(query = '') {
-      const filtered = POKEMON_LIST.filter(p =>
-        matchesSearch(p, query)
-      );
-
-      grid.innerHTML = filtered.map(p => `
+      grid.innerHTML = POKEMON_LIST.filter(p => matchesSearch(p, query)).map(p => `
         <div class="pse-card" data-id="${p.id}">
-          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png" alt="${p.name}">
+          <img src="${spriteUrl(p.id)}" alt="${p.name}" loading="lazy">
           <div class="pse-card-number">${dexNumber(p.id)}</div>
           <div class="pse-card-name">${p.name}</div>
         </div>
       `).join('');
-
-      grid.querySelectorAll('.pse-card').forEach(card => {
-        card.addEventListener('click', () => {
-          addPokemonToTeam(runIdx, parseInt(card.dataset.id));
-          modal.remove();
-        });
-      });
     }
 
-    search.addEventListener('input', e => renderPicker(e.target.value));
+    grid.addEventListener('click', e => {
+      const card = e.target.closest('.pse-card');
+      if (!card) return;
+      addPokemonToTeam(runIdx, Number(card.dataset.id));
+      modal.remove();
+    });
+    modal.querySelector('#pse-search-picker').addEventListener('input', e => renderPicker(e.target.value));
     renderPicker();
-
-    modal.addEventListener('click', e => {
-      if (e.target === modal) modal.remove();
-    });
   }
 
-  function addPokemonToTeam(runIdx, pokemonId) {
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    const pokemon = POKEMON_LIST.find(p => p.id === pokemonId);
-
-    // Add the Pokemon to the team
-    hof[runIdx].team.push({
-      speciesId: pokemonId,
-      name: pokemon.name,
-      nickname: null,
-      level: 50,
-      types: pokemon.types,
-      spriteUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`,
-      isShiny: false,
-      heldItem: null
-    });
-
-    // Save immediately
-    localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));
-
-    // Update the team list in the existing modal
-    updateTeamListUI(runIdx);
+  function addPokemonToTeam(runIdx, speciesId) {
+    const hof = readJson(HOF_KEY, []);
+    hof[runIdx].team.push({ speciesId, nickname: null, level: 50, isShiny: false, heldItem: null });
+    writeJson(HOF_KEY, hof);
+    updateTeamList(runIdx);
   }
 
-  function updateTeamListUI(runIdx) {
-    // Reload from localStorage to get the latest data
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    const run = hof[runIdx];
-
+  // Redraws the team inside the open run modal
+  function updateTeamList(runIdx) {
     const teamList = document.getElementById('pse-team-list');
-    if (teamList) {
-      teamList.innerHTML = run.team.map((p, i) => teamMemberTile(p, runIdx, i)).join('');
-
-      // Update team count
-      const teamCountLabel = teamList.previousElementSibling;
-      if (teamCountLabel) {
-        teamCountLabel.textContent = `Team (${run.team.length}/6)`;
-      }
-    }
+    if (!teamList) return;
+    const { team } = readJson(HOF_KEY, [])[runIdx];
+    teamList.innerHTML = teamTiles(team);
+    document.getElementById('pse-team-count').textContent = `Team (${team.length}/${MAX_TEAM_SIZE})`;
   }
 
   function editTeamMember(runIdx, teamIdx) {
-    const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    const member = hof[runIdx].team[teamIdx];
+    const member = readJson(HOF_KEY, [])[runIdx].team[teamIdx];
+    const name = speciesName(member.speciesId);
     const items = getItemList();
     // Keep an item the game has since removed selectable, so saving does not drop it
     const itemChoices = member.heldItem && !items.some(i => i.id === member.heldItem.id)
       ? [...items, member.heldItem]
       : items;
 
-    const modal = document.createElement('div');
-    modal.className = 'pse-modal';
-    modal.innerHTML = `
-      <div class="pse-modal-box">
-        <div class="pse-modal-title">Edit ${speciesName(member.speciesId)}</div>
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="${teamSpriteUrl(member)}" style="width: 96px; height: 96px; image-rendering: pixelated;">
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Nickname (optional)</label>
-          <input type="text" id="pse-nickname" value="${member.nickname || ''}" placeholder="${speciesName(member.speciesId)}" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: rgba(235, 235, 245, 0.9); font-size: 14px;">
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Level</label>
-          <input type="number" id="pse-level" value="${member.level}" min="1" max="100" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: rgba(235, 235, 245, 0.9); font-size: 14px;">
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">
-            <input type="checkbox" id="pse-is-shiny" ${member.isShiny ? 'checked' : ''}> Shiny
-          </label>
-        </div>
-
-        <div style="margin-bottom: 16px;">
-          <label for="pse-held-item" style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Held Item</label>
-          <button type="button" class="pse-item-picker" id="pse-held-item" aria-expanded="false" aria-controls="pse-item-list"></button>
-          <div class="pse-item-list" id="pse-item-list" hidden>
-            ${[null, ...itemChoices].map(itemOptionHtml).join('')}
-          </div>
-        </div>
-
-        <div class="pse-modal-actions">
-          <button class="pse-btn pse-btn-danger" id="pse-delete-member">Delete</button>
-          <button class="pse-btn pse-btn-secondary" id="pse-cancel-member">Cancel</button>
-          <button class="pse-btn pse-btn-primary" id="pse-save-member">Save</button>
+    const modal = openModal(`
+      <div class="pse-modal-title">Edit ${name}</div>
+      <img class="pse-sprite-lg" src="${teamSpriteUrl(member)}">
+      <div class="pse-field">
+        <label class="pse-label" for="pse-nickname">Nickname (optional)</label>
+        <input type="text" class="pse-input" id="pse-nickname" value="${member.nickname || ''}" placeholder="${name}">
+      </div>
+      <div class="pse-field">
+        <label class="pse-label" for="pse-level">Level</label>
+        <input type="number" class="pse-input" id="pse-level" value="${member.level}" min="1" max="100">
+      </div>
+      <div class="pse-field">
+        <label class="pse-label">
+          <input type="checkbox" id="pse-is-shiny" ${member.isShiny ? 'checked' : ''}> Shiny
+        </label>
+      </div>
+      <div class="pse-field">
+        <label class="pse-label" for="pse-held-item">Held Item</label>
+        <button type="button" class="pse-item-picker" id="pse-held-item" aria-expanded="false" aria-controls="pse-item-list"></button>
+        <div class="pse-item-list" id="pse-item-list" hidden>
+          ${[null, ...itemChoices].map(itemOptionHtml).join('')}
         </div>
       </div>
-    `;
-    document.body.appendChild(modal);
+      <div class="pse-modal-actions">
+        <button class="pse-btn pse-btn-danger" id="pse-delete-member">Delete</button>
+        <button class="pse-btn pse-btn-secondary" id="pse-cancel-member">Cancel</button>
+        <button class="pse-btn pse-btn-primary" id="pse-save-member">Save</button>
+      </div>
+    `);
 
     let selectedItemId = member.heldItem?.id || '';
     const itemPicker = modal.querySelector('#pse-held-item');
@@ -1336,576 +1420,240 @@
     modal.querySelector('#pse-cancel-member').addEventListener('click', () => modal.remove());
 
     modal.querySelector('#pse-save-member').addEventListener('click', () => {
-      const nickname = document.getElementById('pse-nickname').value.trim();
-      const level = parseInt(document.getElementById('pse-level').value);
-      const isShiny = document.getElementById('pse-is-shiny').checked;
-      const itemId = selectedItemId;
-
-      // Reload from localStorage to ensure we have the latest data
-      const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-      const member = hof[runIdx].team[teamIdx];
-
-      member.nickname = nickname || null;
-      member.level = level;
-      member.isShiny = isShiny;
-
-      // Update sprite URL based on shiny status
-      member.spriteUrl = isShiny
-        ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${member.speciesId}.png`
-        : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${member.speciesId}.png`;
+      const hof = readJson(HOF_KEY, []);
+      const saved = hof[runIdx].team[teamIdx];
+      saved.nickname = modal.querySelector('#pse-nickname').value.trim() || null;
+      saved.level = parseInt(modal.querySelector('#pse-level').value);
+      saved.isShiny = modal.querySelector('#pse-is-shiny').checked;
 
       // An unchanged item stays as saved. A new one is copied whole, because the
       // game draws its icon from fields like iconUrl
-      if (!itemId) {
-        member.heldItem = null;
-      } else if (itemId !== member.heldItem?.id) {
-        member.heldItem = { ...itemChoices.find(i => i.id === itemId) };
+      if (!selectedItemId) {
+        saved.heldItem = null;
+      } else if (selectedItemId !== saved.heldItem?.id) {
+        saved.heldItem = { ...itemChoices.find(i => i.id === selectedItemId) };
       }
 
-      localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));
+      writeJson(HOF_KEY, hof);
       modal.remove();
-
-      // Update the team list UI
-      updateTeamListUI(runIdx);
+      updateTeamList(runIdx);
     });
 
     modal.querySelector('#pse-delete-member').addEventListener('click', () => {
-      // Reload from localStorage to ensure we have the latest data
-      const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
+      const hof = readJson(HOF_KEY, []);
       hof[runIdx].team.splice(teamIdx, 1);
-      localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));
+      writeJson(HOF_KEY, hof);
       modal.remove();
-
-      // Update the team list UI
-      updateTeamListUI(runIdx);
-    });
-
-    modal.addEventListener('click', e => {
-      if (e.target === modal) modal.remove();
+      updateTeamList(runIdx);
     });
   }
 
   // ─── Stat Buffs ──────────────────────────────────────────────────────────────
+  const STATS = ['hp', 'atk', 'special', 'def', 'speed', 'spdef'];
+  const STAT_LABELS = { hp: 'HP', atk: 'ATK', special: 'SPA', def: 'DEF', speed: 'SPE', spdef: 'SPD' };
+  const MAX_STAT_BUFF = 10;
+  const CHEAT_MAX_STAT_BUFF = 999;
+  const MAX_BUFF_POINTS = 50;
+
+  // ATK and Special mirror each other in the game, so together they cost one stat's points
+  const buffTotal = (buffs = {}) => (buffs.hp || 0) + Math.max(buffs.atk || 0, buffs.special || 0)
+    + (buffs.def || 0) + (buffs.speed || 0) + (buffs.spdef || 0);
+
   function renderStatBuffs(container) {
-    const statBuffs = JSON.parse(localStorage.getItem('poke_stat_buffs') || '{}');
-    const hofData = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
+    const statBuffs = readJson(BUFFS_KEY, {});
+    const hideLegendaries = localStorage.getItem('pse_filter_legendaries') === 'true';
 
-    // Get filter state from localStorage
-    const filterLegendaries = localStorage.getItem('pse_filter_legendaries') === 'true';
-
-    // Get unique Pokémon from Hall of Fame, mapped to their BASE FORMS
-    const hofPokemonMap = new Map();
-    hofData.forEach(run => {
-      if (run.team && Array.isArray(run.team)) {
-        run.team.forEach(member => {
-          const evolvedId = member.speciesId;
-          const baseId = getEvoLineRoot(evolvedId); // Map to base form
-
-          // Skip legendaries if filter is enabled
-          if (filterLegendaries && LEGENDARY_ID_SET.has(baseId)) {
-            return;
-          }
-
-          if (!hofPokemonMap.has(baseId)) {
-            const pokemon = POKEMON_LIST.find(p => p.id === baseId);
-            hofPokemonMap.set(baseId, {
-              id: baseId,
-              name: pokemon?.name || `#${baseId}`,
-              isShiny: member.isShiny || false,
-              spriteUrl: member.isShiny
-                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${baseId}.png`
-                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${baseId}.png`
-            });
-          } else if (member.isShiny && !hofPokemonMap.get(baseId).isShiny) {
-            // Prioritize shiny sprite if found
-            hofPokemonMap.get(baseId).isShiny = true;
-            hofPokemonMap.get(baseId).spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${baseId}.png`;
-          }
-        });
+    // Buffs count for a whole evolution line, so each line shows up once, as its base
+    // form. The value is true when any member of the line was shiny
+    const lines = new Map();
+    for (const run of readJson(HOF_KEY, [])) {
+      for (const member of run.team || []) {
+        const baseId = getEvoLineRoot(member.speciesId);
+        if (hideLegendaries && LEGENDARY_ID_SET.has(baseId)) continue;
+        lines.set(baseId, lines.get(baseId) || Boolean(member.isShiny));
       }
-    });
-
-    // Separate into buffed and unbuffed arrays
-    const buffedPokemon = [];
-    const unbuffedPokemon = [];
-
-    hofPokemonMap.forEach((poke, id) => {
-      if (statBuffs[id]) {
-        buffedPokemon.push({ ...poke, buffs: statBuffs[id] });
-      } else {
-        unbuffedPokemon.push(poke);
-      }
-    });
-
-    container.innerHTML = `
-      <div style="margin-bottom: 16px; padding: 12px; background: rgba(139, 92, 246, 0.1); border: 0.5px solid rgba(139, 92, 246, 0.3); border-radius: 8px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <div>
-            <div style="font-size: 13px; color: rgba(235, 235, 245, 0.8);">Showing base forms of Pokémon from Hall of Fame</div>
-            <div style="font-size: 11px; color: rgba(235, 235, 245, 0.6); margin-top: 4px;">Click any Pokémon to edit their stat buffs (buffs apply to entire evolution line)</div>
-          </div>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
-            <input type="checkbox" id="pse-filter-legendaries" ${filterLegendaries ? 'checked' : ''}
-              style="width: 16px; height: 16px; cursor: pointer; accent-color: rgba(139, 92, 246, 1);">
-            <span style="font-size: 12px; color: rgba(235, 235, 245, 0.8); white-space: nowrap;">Battle Tower only</span>
-          </label>
-        </div>
-      </div>
-      <div class="pse-grid" id="pse-buff-grid"></div>
-    `;
-
-    const grid = document.getElementById('pse-buff-grid');
-
-    if (hofPokemonMap.size === 0) {
-      const message = filterLegendaries
-        ? 'No non-legendary Pokémon in Hall of Fame. Uncheck "Battle Tower only" to see all Pokémon.'
-        : 'No Pokémon in Hall of Fame yet. Complete a run to see Pokémon here.';
-      grid.innerHTML = `<div style="text-align: center; padding: 40px; color: rgba(235, 235, 245, 0.5);">${message}</div>`;
-
-      // Add event listener for the checkbox
-      const checkbox = document.getElementById('pse-filter-legendaries');
-      if (checkbox) {
-        checkbox.addEventListener('change', (e) => {
-          localStorage.setItem('pse_filter_legendaries', e.target.checked);
-          renderContent();
-        });
-      }
-      return;
     }
+    const ids = [...lines.keys()];
+    const buffedFirst = [...ids.filter(id => statBuffs[id]), ...ids.filter(id => !statBuffs[id])];
 
-    // Render buffed first, then unbuffed
-    const allPokemon = [...buffedPokemon, ...unbuffedPokemon];
-
-    grid.innerHTML = allPokemon.map(poke => {
-      const totalBuffs = poke.buffs
-        ? (poke.buffs.hp || 0) + Math.max(poke.buffs.atk || 0, poke.buffs.special || 0) + (poke.buffs.def || 0) + (poke.buffs.speed || 0) + (poke.buffs.spdef || 0)
-        : 0;
-
+    const cards = buffedFirst.map(id => {
+      const shiny = lines.get(id);
+      const total = buffTotal(statBuffs[id]);
       return `
-        <div class="pse-card ${poke.buffs ? 'owned' : ''}" data-id="${poke.id}" style="cursor: pointer;">
-          <img src="${poke.spriteUrl}" alt="${poke.name}">
-          <div class="pse-card-number">${dexNumber(poke.id)}</div>
-          <div class="pse-card-name">${poke.isShiny ? '✨ ' : ''}${poke.name}</div>
-          ${totalBuffs > 0 ? `<div style="font-size: 11px; color: rgba(139, 92, 246, 1); margin-top: 4px;">${totalBuffs} buff points</div>` : ''}
+        <div class="pse-card ${statBuffs[id] ? 'owned' : ''}" data-id="${id}">
+          <img src="${spriteUrl(id, shiny)}" alt="${speciesName(id)}">
+          <div class="pse-card-number">${dexNumber(id)}</div>
+          <div class="pse-card-name">${shiny ? '✨ ' : ''}${speciesName(id)}</div>
+          ${total > 0 ? `<div class="pse-buff-points">${total} buff points</div>` : ''}
         </div>
       `;
     }).join('');
+    const emptyMessage = hideLegendaries
+      ? 'No non-legendary Pokémon in Hall of Fame. Uncheck "Battle Tower only" to see all Pokémon.'
+      : 'No Pokémon in Hall of Fame yet. Complete a run to see Pokémon here.';
 
-    grid.querySelectorAll('.pse-card').forEach(card => {
-      card.addEventListener('click', () => {
-        editStatBuffs(parseInt(card.dataset.id));
-      });
-    });
-
-    // Add event listener for the checkbox
-    const checkbox = document.getElementById('pse-filter-legendaries');
-    if (checkbox) {
-      checkbox.addEventListener('change', (e) => {
-        localStorage.setItem('pse_filter_legendaries', e.target.checked);
-        renderContent();
-      });
-    }
-  }
-
-
-  async function editStatBuffs(pokemonId) {
-    const statBuffs = JSON.parse(localStorage.getItem('poke_stat_buffs') || '{}');
-    const buffs = statBuffs[pokemonId] || { hp: 0, atk: 0, def: 0, speed: 0, special: 0, spdef: 0 };
-    const pokemon = POKEMON_LIST.find(p => p.id === pokemonId);
-
-    // Calculate max buff points based on user's stage progress
-    const hofData = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
-    const maxCompletedStage = hofData
-      .filter(e => e.endless && e.stageNumber)
-      .reduce((max, e) => Math.max(max, e.stageNumber), 0);
-    const unlockedStage = Math.max(1, maxCompletedStage + 1);
-    const legitMaxPoints = Math.min(unlockedStage * 10, 50);
-
-    // Check if cheat mode is enabled
-    const cheatMode = localStorage.getItem('pse_cheat_mode') === 'true';
-    const maxPoints = cheatMode ? 50 : legitMaxPoints;
-
-    // Try to get base stats from cached localStorage data (game already fetches this)
-    let baseStats = null;
-    let isSpecialAttacker = null;
-    let hiddenAttackStat = null;
-
-    const cachedKey = `pkrl_poke_${pokemonId}`;
-    const cachedData = localStorage.getItem(cachedKey);
-
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData);
-        if (parsed.baseStats && parsed.baseStats.special !== undefined && parsed.baseStats.atk !== undefined) {
-          baseStats = {
-            atk: parsed.baseStats.atk,
-            special: parsed.baseStats.special,
-          };
-          isSpecialAttacker = baseStats.special >= baseStats.atk;
-          hiddenAttackStat = isSpecialAttacker ? 'atk' : 'special';
-        }
-      } catch (e) {
-        console.warn('Failed to parse cached Pokemon data', e);
-      }
-    }
-
-    // If no cached data, show both attack stats as fallback
-    if (!baseStats) {
-      console.warn(`No cached data found for Pokemon ${pokemonId}, showing both attack stats`);
-    }
-
-    // Calculate current total buff points
-    const getCurrentTotal = () => {
-      const getVal = (id, fallback) => {
-        const el = document.getElementById(id);
-        if (!el) return fallback ?? 0;
-        const val = parseInt(el.value);
-        return isNaN(val) ? 0 : val;
-      };
-
-      const hp = getVal('pse-buff-hp', buffs.hp);
-      const atk = getVal('pse-buff-atk', buffs.atk);
-      const def = getVal('pse-buff-def', buffs.def);
-      const speed = getVal('pse-buff-speed', buffs.speed);
-      const special = getVal('pse-buff-special', buffs.special);
-      const spdef = getVal('pse-buff-spdef', buffs.spdef);
-      const atkPts = Math.max(atk, special);
-      return hp + atkPts + def + speed + spdef;
-    };
-
-    const initialTotal = (buffs.hp || 0) + Math.max(buffs.atk || 0, buffs.special || 0) + (buffs.def || 0) + (buffs.speed || 0) + (buffs.spdef || 0);
-
-    const modal = document.createElement('div');
-    modal.className = 'pse-modal';
-
-    // Build stats list, filtering out the hidden attack stat if we know it
-    const allStats = ['hp', 'atk', 'special', 'def', 'speed', 'spdef'];
-    const visibleStats = hiddenAttackStat
-      ? allStats.filter(s => s !== hiddenAttackStat)
-      : allStats;
-
-    modal.innerHTML = `
-      <div class="pse-modal-box">
-        <div class="pse-modal-title">Stat Buffs - ${pokemon?.name || `#${pokemonId}`}</div>
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png" style="width: 96px; height: 96px; image-rendering: pixelated;">
-        </div>
-
-        <div style="margin-bottom: 12px; padding: 12px; background: rgba(139, 92, 246, 0.1); border: 0.5px solid rgba(139, 92, 246, 0.3); border-radius: 8px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div style="font-size: 13px; color: rgba(235, 235, 245, 0.9); font-weight: 600;">
-              <span id="pse-buff-total">${initialTotal}</span>${cheatMode ? '' : ` / ${maxPoints}`} points used
-            </div>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
-              <input type="checkbox" id="pse-cheat-mode-toggle" ${cheatMode ? 'checked' : ''}
-                style="width: 16px; height: 16px; cursor: pointer; accent-color: rgba(255, 100, 100, 1);">
-              <span style="font-size: 11px; color: rgba(255, 100, 100, 1); white-space: nowrap;">Cheat Mode</span>
-            </label>
+    container.innerHTML = `
+      <div class="pse-info-box">
+        <div class="pse-info-header">
+          <div>
+            <div style="font-size: 13px; color: rgba(235, 235, 245, 0.8);">Showing base forms of Pokémon from Hall of Fame</div>
+            <div class="pse-hint">Click any Pokémon to edit their stat buffs (buffs apply to entire evolution line)</div>
           </div>
-          <div style="font-size: 11px; color: rgba(235, 235, 245, 0.6); margin-bottom: 4px;">Each stat: 0-10 buffs (+10% per buff)</div>
-          ${hiddenAttackStat ? `<div style="font-size: 11px; color: rgba(235, 235, 245, 0.6);">This Pokémon is a ${isSpecialAttacker ? 'Special' : 'Physical'} attacker</div>` : '<div style="font-size: 11px; color: rgba(235, 235, 245, 0.6);">ATK and Special mirror each other</div>'}
-          ${!cheatMode && maxPoints < 50 ? `<div style="font-size: 11px; color: rgba(255, 180, 0, 0.8); margin-top: 4px;">Complete Stage ${Math.min(5, unlockedStage)} to unlock more points (max 50)</div>` : ''}
-          ${cheatMode ? `<div style="font-size: 11px; color: rgba(255, 100, 100, 0.8); margin-top: 4px;">⚠️ All caps removed</div>` : ''}
-        </div>
-
-        ${visibleStats.map(stat => {
-          const labels = { hp: 'HP', atk: 'ATK', def: 'DEF', speed: 'SPE', special: 'SPA', spdef: 'SPD' };
-          return `
-            <div style="margin-bottom: 16px;">
-              <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">
-                <span id="pse-buff-${stat}-label">${labels[stat]} (${buffs[stat] || 0}/10) - +${(buffs[stat] || 0) * 10}%</span>
-              </label>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <input type="range" id="pse-buff-${stat}" min="0" max="10" value="${buffs[stat] || 0}"
-                  style="flex: 1; accent-color: rgba(139, 92, 246, 1);">
-                <input type="number" id="pse-buff-${stat}-num" min="0" max="10" value="${buffs[stat] || 0}"
-                  style="width: 60px; padding: 6px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: rgba(235, 235, 245, 0.9); font-size: 13px; text-align: center;">
-              </div>
-            </div>
-          `;
-        }).join('')}
-
-        <div class="pse-modal-actions">
-          <button class="pse-btn pse-btn-danger" id="pse-delete-buffs">Delete</button>
-          <button class="pse-btn pse-btn-secondary" id="pse-cancel-buffs">Cancel</button>
-          <button class="pse-btn pse-btn-primary" id="pse-save-buffs">Save</button>
+          <label class="pse-checkbox">
+            <input type="checkbox" id="pse-filter-legendaries" ${hideLegendaries ? 'checked' : ''}> Battle Tower only
+          </label>
         </div>
       </div>
+      <div class="pse-grid" id="pse-buff-grid">
+        ${cards || `<div class="pse-empty">${emptyMessage}</div>`}
+      </div>
     `;
-    document.body.appendChild(modal);
 
-    const totalDisplay = document.getElementById('pse-buff-total');
-    const cheatModeToggle = document.getElementById('pse-cheat-mode-toggle');
-    let currentCheatMode = cheatMode;
-
-    // Update total display and enforce cap
-    const updateTotal = () => {
-      const total = getCurrentTotal();
-      const newTotalDisplay = document.getElementById('pse-buff-total');
-      if (newTotalDisplay) {
-        newTotalDisplay.textContent = total;
-
-        // Use the checkbox state directly to ensure we have the latest value
-        const isCheatMode = document.getElementById('pse-cheat-mode-toggle').checked;
-        const currentMaxPoints = isCheatMode ? Infinity : maxPoints;
-
-        // Color code based on cap
-        if (!isCheatMode && total > currentMaxPoints) {
-          newTotalDisplay.style.color = 'rgba(255, 100, 100, 1)';
-        } else if (!isCheatMode && total === currentMaxPoints) {
-          newTotalDisplay.style.color = 'rgba(255, 215, 0, 1)';
-        } else {
-          newTotalDisplay.style.color = 'rgba(235, 235, 245, 0.9)';
-        }
-      }
-    };
-
-    // Handle cheat mode toggle
-    cheatModeToggle.addEventListener('change', (e) => {
-      currentCheatMode = e.target.checked;
-      localStorage.setItem('pse_cheat_mode', currentCheatMode ? 'true' : 'false');
-
-      // Update the total display text properly
-      const currentTotal = getCurrentTotal();
-      const newTotalDisplay = document.getElementById('pse-buff-total');
-      if (newTotalDisplay) {
-        newTotalDisplay.textContent = currentTotal;
-      }
-
-      // Find the header div and update the text after the total span
-      const headerDiv = totalDisplay.parentElement;
-
-      // Remove all text nodes after the total span
-      Array.from(headerDiv.childNodes).forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          node.remove();
-        }
-      });
-
-      // Add the correct text after the total span
-      const totalSpan = document.getElementById('pse-buff-total');
-      if (totalSpan) {
-        const textToAdd = currentCheatMode
-          ? ' points used'
-          : ` / ${maxPoints} points used`;
-        totalSpan.insertAdjacentText('afterend', textToAdd);
-      }
-
-      // Update info messages
-      const infoBox = headerDiv.closest('div[style*="background: rgba(139, 92, 246, 0.1)"]');
-      const lastChild = infoBox.lastElementChild;
-
-      if (currentCheatMode) {
-        // Remove any existing warning and add cheat mode message
-        if (lastChild && (lastChild.textContent.includes('Complete Stage') || lastChild.textContent === '')) {
-          lastChild.remove();
-        }
-        if (!infoBox.textContent.includes('All caps removed')) {
-          const cheatMsg = document.createElement('div');
-          cheatMsg.style.cssText = 'font-size: 11px; color: rgba(255, 100, 100, 0.8); margin-top: 4px;';
-          cheatMsg.textContent = '⚠️ All caps removed';
-          infoBox.appendChild(cheatMsg);
-        }
-      } else {
-        // Remove cheat mode message and add stage warning if needed
-        if (lastChild && lastChild.textContent.includes('All caps removed')) {
-          lastChild.remove();
-        }
-        if (maxPoints < 50 && !infoBox.textContent.includes('Complete Stage')) {
-          const stageMsg = document.createElement('div');
-          stageMsg.style.cssText = 'font-size: 11px; color: rgba(255, 180, 0, 0.8); margin-top: 4px;';
-          stageMsg.textContent = `Complete Stage ${Math.min(5, unlockedStage)} to unlock more points (max 50)`;
-          infoBox.appendChild(stageMsg);
-        }
-      }
-
-      // Update max values on sliders and inputs WITHOUT resetting values
-      visibleStats.forEach(stat => {
-        const numInput = document.getElementById(`pse-buff-${stat}-num`);
-        const slider = document.getElementById(`pse-buff-${stat}`);
-        const label = document.getElementById(`pse-buff-${stat}-label`);
-        const labels = { hp: 'HP', atk: 'ATK', def: 'DEF', speed: 'SPE', special: 'SPA', spdef: 'SPD' };
-
-        // Don't read the value - it causes reset. Just update the max attributes
-        if (currentCheatMode) {
-          numInput.removeAttribute('max');
-          slider.setAttribute('max', '999');
-        } else {
-          numInput.setAttribute('max', '10');
-          slider.setAttribute('max', '10');
-          // Clamp values to 10 if they exceed
-          const currentVal = parseInt(slider.value);
-          if (currentVal > 10) {
-            slider.value = 10;
-            numInput.value = 10;
-          }
-        }
-
-        // Update label with current value from slider (don't reset)
-        const val = parseInt(slider.value);
-        label.textContent = `${labels[stat]} (${val}/${currentCheatMode ? '∞' : '10'}) - +${val * 10}%`;
-      });
-
-      updateTotal();
+    container.querySelector('#pse-filter-legendaries').addEventListener('change', e => {
+      localStorage.setItem('pse_filter_legendaries', e.target.checked);
+      renderContent();
     });
+    container.querySelector('#pse-buff-grid').addEventListener('click', e => {
+      const card = e.target.closest('.pse-card');
+      if (card) editStatBuffs(Number(card.dataset.id));
+    });
+  }
 
-    // Sync sliders with number inputs
-    visibleStats.forEach(stat => {
-      const slider = document.getElementById(`pse-buff-${stat}`);
-      const numInput = document.getElementById(`pse-buff-${stat}-num`);
-      const label = document.getElementById(`pse-buff-${stat}-label`);
-      const labels = { hp: 'HP', atk: 'ATK', def: 'DEF', speed: 'SPE', special: 'SPA', spdef: 'SPD' };
+  // The attack stat a Pokémon does not use, judged from the base stats the game
+  // caches under pkrl_poke_<id>. Null when nothing is cached: then both stay visible
+  function unusedAttackStat(pokemonId) {
+    const stats = readJson(`pkrl_poke_${pokemonId}`, null)?.baseStats;
+    if (stats?.atk === undefined || stats.special === undefined) return null;
+    return stats.special >= stats.atk ? 'atk' : 'special';
+  }
 
-      // Set initial max based on cheat mode
-      if (currentCheatMode) {
-        numInput.removeAttribute('max');
-        slider.setAttribute('max', '999');
+  function highestClearedStage() {
+    return readJson(HOF_KEY, [])
+      .filter(run => run.endless && run.stageNumber)
+      .reduce((max, run) => Math.max(max, run.stageNumber), 0);
+  }
+
+  function editStatBuffs(pokemonId) {
+    const statBuffs = readJson(BUFFS_KEY, {});
+    const hiddenStat = unusedAttackStat(pokemonId);
+    const visibleStats = STATS.filter(stat => stat !== hiddenStat);
+    // 10 points to start, plus 10 for every cleared Battle Tower stage
+    const nextStage = highestClearedStage() + 1;
+    const pointCap = Math.min(nextStage * 10, MAX_BUFF_POINTS);
+    // Saving mirrors ATK and Special, so the hidden one only has to stay out of the total
+    const values = { hp: 0, atk: 0, special: 0, def: 0, speed: 0, spdef: 0, ...statBuffs[pokemonId] };
+    if (hiddenStat) values[hiddenStat] = 0;
+
+    const modal = openModal(`
+      <div class="pse-modal-title">Stat Buffs - ${speciesName(pokemonId)}</div>
+      <img class="pse-sprite-lg" src="${spriteUrl(pokemonId)}">
+      <div class="pse-info-box">
+        <div class="pse-info-header">
+          <div class="pse-buff-used"><span id="pse-buff-total"></span><span id="pse-buff-cap"></span> points used</div>
+          <label class="pse-checkbox pse-checkbox-danger">
+            <input type="checkbox" id="pse-cheat-mode-toggle" ${localStorage.getItem('pse_cheat_mode') === 'true' ? 'checked' : ''}> Cheat Mode
+          </label>
+        </div>
+        <div class="pse-hint">Each stat: 0-10 buffs (+10% per buff)</div>
+        <div class="pse-hint">${hiddenStat ? `This Pokémon is a ${hiddenStat === 'atk' ? 'Special' : 'Physical'} attacker` : 'ATK and Special mirror each other'}</div>
+        <div class="pse-hint pse-hint-warn" id="pse-buff-stage-hint">Complete Stage ${nextStage} to unlock more points (max ${MAX_BUFF_POINTS})</div>
+        <div class="pse-hint pse-hint-danger" id="pse-buff-cheat-hint">⚠️ All caps removed</div>
+      </div>
+      ${visibleStats.map(stat => `
+        <div class="pse-field">
+          <label class="pse-label" for="pse-buff-${stat}" id="pse-buff-${stat}-label"></label>
+          <div class="pse-buff-row">
+            <input type="range" id="pse-buff-${stat}" data-stat="${stat}" min="0">
+            <input type="number" class="pse-input" id="pse-buff-${stat}-num" data-stat="${stat}" min="0">
+          </div>
+        </div>
+      `).join('')}
+      <div class="pse-modal-actions">
+        <button class="pse-btn pse-btn-danger" id="pse-delete-buffs">Delete</button>
+        <button class="pse-btn pse-btn-secondary" id="pse-cancel-buffs">Cancel</button>
+        <button class="pse-btn pse-btn-primary" id="pse-save-buffs">Save</button>
+      </div>
+    `);
+
+    const cheatToggle = modal.querySelector('#pse-cheat-mode-toggle');
+    const totalDisplay = modal.querySelector('#pse-buff-total');
+    const statMax = () => (cheatToggle.checked ? CHEAT_MAX_STAT_BUFF : MAX_STAT_BUFF);
+
+    function showStat(stat) {
+      const value = values[stat];
+      modal.querySelector(`#pse-buff-${stat}`).value = value;
+      modal.querySelector(`#pse-buff-${stat}-num`).value = value;
+      modal.querySelector(`#pse-buff-${stat}-label`).textContent =
+        `${STAT_LABELS[stat]} (${value}/${cheatToggle.checked ? '∞' : MAX_STAT_BUFF}) - +${value * 10}%`;
+    }
+
+    function showTotal() {
+      const total = buffTotal(values);
+      const capped = !cheatToggle.checked;
+      totalDisplay.textContent = total;
+      totalDisplay.classList.toggle('full', capped && total === pointCap);
+      totalDisplay.classList.toggle('over', capped && total > pointCap);
+    }
+
+    function showMode() {
+      const cheat = cheatToggle.checked;
+      modal.querySelector('#pse-buff-cap').textContent = cheat ? '' : ` / ${pointCap}`;
+      modal.querySelector('#pse-buff-stage-hint').hidden = cheat || pointCap >= MAX_BUFF_POINTS;
+      modal.querySelector('#pse-buff-cheat-hint').hidden = !cheat;
+      for (const stat of visibleStats) {
+        modal.querySelector(`#pse-buff-${stat}`).max = statMax();
+        modal.querySelector(`#pse-buff-${stat}-num`).max = statMax();
+        values[stat] = Math.min(values[stat], statMax());
+        showStat(stat);
       }
+      showTotal();
+    }
 
-      slider.addEventListener('input', () => {
-        // Use the checkbox state directly to ensure we have the latest value
-        const isCheatMode = document.getElementById('pse-cheat-mode-toggle').checked;
+    // Raising a stat stops at the point cap, lowering it always works
+    function setStat(stat, requested) {
+      let value = Math.max(0, Math.min(statMax(), requested || 0));
+      if (!cheatToggle.checked) {
+        while (value > values[stat] && buffTotal({ ...values, [stat]: value }) > pointCap) value--;
+      }
+      values[stat] = value;
+      showStat(stat);
+      showTotal();
+    }
 
-        if (!isCheatMode) {
-          const newVal = parseInt(slider.value);
-
-          // Calculate total by reading all current values from DOM
-          let total = 0;
-          visibleStats.forEach(s => {
-            const sInput = document.getElementById(`pse-buff-${s}-num`);
-            if (s === stat) {
-              // Use the new value for this stat
-              total += newVal;
-            } else {
-              total += parseInt(sInput?.value || 0);
-            }
-          });
-
-          // For ATK/Special, only count the max of the two
-          if (visibleStats.includes('atk') && visibleStats.includes('special')) {
-            const atkVal = stat === 'atk' ? newVal : parseInt(document.getElementById('pse-buff-atk-num')?.value || 0);
-            const specVal = stat === 'special' ? newVal : parseInt(document.getElementById('pse-buff-special-num')?.value || 0);
-            total = total - atkVal - specVal + Math.max(atkVal, specVal);
-          } else if (!visibleStats.includes('atk') && stat === 'special') {
-            // Special is visible but ATK is hidden - they mirror
-            // Already counted correctly
-          } else if (!visibleStats.includes('special') && stat === 'atk') {
-            // ATK is visible but Special is hidden - they mirror
-            // Already counted correctly
-          }
-
-          if (total > maxPoints) {
-            // Don't allow the change
-            slider.value = numInput.value;
-            return;
-          }
-        }
-
-        numInput.value = slider.value;
-        label.textContent = `${labels[stat]} (${slider.value}/${isCheatMode ? '∞' : '10'}) - +${slider.value * 10}%`;
-        updateTotal();
-      });
-
-      numInput.addEventListener('input', () => {
-        // Use the checkbox state directly to ensure we have the latest value
-        const isCheatMode = document.getElementById('pse-cheat-mode-toggle').checked;
-        const maxVal = isCheatMode ? 999 : 10;
-        let val = Math.max(0, Math.min(maxVal, parseInt(numInput.value) || 0));
-
-        // Check if this would exceed total cap (only if not in cheat mode)
-        if (!isCheatMode) {
-          // Calculate total by reading all current values from DOM
-          let total = 0;
-          visibleStats.forEach(s => {
-            const sInput = document.getElementById(`pse-buff-${s}-num`);
-            if (s === stat) {
-              // Use the new value for this stat
-              total += val;
-            } else {
-              total += parseInt(sInput?.value || 0);
-            }
-          });
-
-          // For ATK/Special, only count the max of the two
-          if (visibleStats.includes('atk') && visibleStats.includes('special')) {
-            const atkVal = stat === 'atk' ? val : parseInt(document.getElementById('pse-buff-atk-num')?.value || 0);
-            const specVal = stat === 'special' ? val : parseInt(document.getElementById('pse-buff-special-num')?.value || 0);
-            total = total - atkVal - specVal + Math.max(atkVal, specVal);
-          }
-
-          if (total > maxPoints) {
-            // Calculate how much we can actually add
-            const currentWithoutThis = total - val;
-            val = Math.max(0, maxPoints - currentWithoutThis);
-          }
-        }
-
-        numInput.value = val;
-        slider.value = Math.min(val, parseInt(slider.max));
-        label.textContent = `${labels[stat]} (${val}/${isCheatMode ? '∞' : '10'}) - +${val * 10}%`;
-        updateTotal();
-      });
+    modal.addEventListener('input', e => {
+      const { stat } = e.target.dataset;
+      if (stat) setStat(stat, parseInt(e.target.value));
+    });
+    cheatToggle.addEventListener('change', () => {
+      localStorage.setItem('pse_cheat_mode', cheatToggle.checked);
+      showMode();
     });
 
     modal.querySelector('#pse-cancel-buffs').addEventListener('click', () => modal.remove());
 
     modal.querySelector('#pse-save-buffs').addEventListener('click', () => {
-      const total = getCurrentTotal();
-
-      // Use the checkbox state directly to ensure we have the latest value
-      const isCheatMode = document.getElementById('pse-cheat-mode-toggle').checked;
-
-      // Enforce cap (unless cheat mode)
-      if (!isCheatMode && total > maxPoints) {
-        alert(`Total buff points (${total}) exceeds your cap (${maxPoints}). Complete more Battle Tower stages to increase your cap, or enable Cheat Mode.`);
+      const total = buffTotal(values);
+      if (!cheatToggle.checked && total > pointCap) {
+        alert(`Total buff points (${total}) exceeds your cap (${pointCap}). Complete more Battle Tower stages to increase your cap, or enable Cheat Mode.`);
         return;
       }
-
-      // Helper to safely get value from DOM (never fall back to old buffs)
-      const getVal = (id) => {
-        const el = document.getElementById(id);
-        if (!el) return 0;
-        const val = parseInt(el.value);
-        return isNaN(val) ? 0 : val;
+      const attack = Math.max(values.atk, values.special);
+      statBuffs[pokemonId] = {
+        hp: values.hp, atk: attack, def: values.def, speed: values.speed, special: attack, spdef: values.spdef,
       };
-
-      let newBuffs = {
-        hp: getVal('pse-buff-hp'),
-        atk: getVal('pse-buff-atk'),
-        def: getVal('pse-buff-def'),
-        speed: getVal('pse-buff-speed'),
-        special: getVal('pse-buff-special'),
-        spdef: getVal('pse-buff-spdef'),
-      };
-
-      // If NOT in cheat mode, clamp all values to 10 (game's max per stat)
-      if (!isCheatMode) {
-        Object.keys(newBuffs).forEach(key => {
-          newBuffs[key] = Math.min(10, newBuffs[key]);
-        });
-      }
-
-      // Mirror ATK and Special (game mechanic - they always stay in sync)
-      const maxAttack = Math.max(newBuffs.atk, newBuffs.special);
-      newBuffs.atk = maxAttack;
-      newBuffs.special = maxAttack;
-
-      statBuffs[pokemonId] = newBuffs;
-      localStorage.setItem('poke_stat_buffs', JSON.stringify(statBuffs));
+      writeJson(BUFFS_KEY, statBuffs);
       modal.remove();
       renderContent();
     });
 
     modal.querySelector('#pse-delete-buffs').addEventListener('click', () => {
       delete statBuffs[pokemonId];
-      localStorage.setItem('poke_stat_buffs', JSON.stringify(statBuffs));
+      writeJson(BUFFS_KEY, statBuffs);
       modal.remove();
       renderContent();
     });
 
-    modal.addEventListener('click', e => {
-      if (e.target === modal) modal.remove();
-    });
+    showMode();
   }
 
   // ─── Achievements Data ───────────────────────────────────────────────────────
@@ -2146,18 +1894,7 @@
     { id: 'infinite_100', name: 'Infinite Legend', desc: 'Reach floor 100 in Infinite Mode', icon: '♾️', category: 'tower' },
   ];
 
-  // The game's own list is a top-level const in its scripts: code running in
-  // the page reaches it by name, but it is not a window property
-  function getAchievementList() {
-    try {
-      if (typeof ACHIEVEMENTS !== 'undefined' && Array.isArray(ACHIEVEMENTS) && ACHIEVEMENTS.length) {
-        return ACHIEVEMENTS;
-      }
-    } catch {
-      // Not reachable from where this script runs
-    }
-    return BUILTIN_ACHIEVEMENTS;
-  }
+  const getAchievementList = () => readGameList(() => ACHIEVEMENTS, BUILTIN_ACHIEVEMENTS);
 
   function renderAchievements(container) {
     const list = getAchievementList();
@@ -2191,7 +1928,7 @@
     missingOnly.checked = localStorage.getItem('pse_ach_missing_only') === 'true';
 
     function saveUnlocked(unlocked) {
-      localStorage.setItem('poke_achievements', JSON.stringify([...unlocked]));
+      writeJson('poke_achievements', [...unlocked]);
       renderSections();
     }
 
@@ -2214,7 +1951,7 @@
                 <button class="pse-btn pse-btn-secondary pse-ach-unlock-all">Unlock all</button>
                 <button class="pse-btn pse-btn-danger pse-ach-lock-all">Lock all</button>
               </div>
-              <div class="pse-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+              <div class="pse-grid pse-ach-grid">
                 ${shown.map(a => renderAchievementCard(a, unlocked.has(a.id))).join('')}
               </div>
             </div>
@@ -2260,23 +1997,11 @@
 
   function renderAchievementCard(achievement, isUnlocked) {
     return `
-      <div class="pse-achievement-card ${isUnlocked ? 'unlocked' : 'locked'}" data-id="${achievement.id}" style="
-        padding: 16px;
-        background: ${isUnlocked ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255, 255, 255, 0.02)'};
-        border: 0.5px solid ${isUnlocked ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)'};
-        border-radius: 12px;
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        opacity: ${isUnlocked ? '1' : '0.5'};
-      " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 16px rgba(0,0,0,0.3)';" onmouseout="this.style.transform=''; this.style.boxShadow='';">
-        <div style="font-size: 32px; text-align: center; margin-bottom: 8px;">${achievement.icon}</div>
-        <div style="font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 4px; color: ${isUnlocked ? 'rgba(139, 92, 246, 1)' : 'rgba(235, 235, 245, 0.7)'};">
-          ${achievement.name}
-        </div>
-        <div style="font-size: 11px; text-align: center; color: rgba(235, 235, 245, 0.5); line-height: 1.4;">
-          ${achievement.desc}
-        </div>
-        ${isUnlocked ? '<div style="text-align: center; margin-top: 8px; font-size: 16px;">✓</div>' : ''}
+      <div class="pse-achievement-card ${isUnlocked ? 'unlocked' : ''}" data-id="${achievement.id}">
+        <div class="pse-ach-icon">${achievement.icon}</div>
+        <div class="pse-ach-name">${achievement.name}</div>
+        <div class="pse-ach-desc">${achievement.desc}</div>
+        ${isUnlocked ? '<div class="pse-ach-check">✓</div>' : ''}
       </div>
     `;
   }
@@ -2288,18 +2013,17 @@
 
     container.innerHTML = `
       <div style="max-width: 500px;">
-        <div style="margin-bottom: 20px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Elite Wins</label>
-          <input type="number" id="pse-elite-wins" value="${eliteWins}" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: rgba(235, 235, 245, 0.9); font-size: 14px;">
+        <div class="pse-field">
+          <label class="pse-label" for="pse-elite-wins">Elite Wins</label>
+          <input type="number" class="pse-input" id="pse-elite-wins" value="${eliteWins}">
         </div>
-        <div style="margin-bottom: 20px;">
-          <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Win Streak</label>
-          <input type="number" id="pse-win-streak" value="${winStreak}" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: rgba(235, 235, 245, 0.9); font-size: 14px;">
+        <div class="pse-field">
+          <label class="pse-label" for="pse-win-streak">Win Streak</label>
+          <input type="number" class="pse-input" id="pse-win-streak" value="${winStreak}">
         </div>
-        <div style="margin-bottom: 20px;">
-          <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7); cursor: pointer;">
-            <input type="checkbox" id="pse-last-run-won" ${lastRunWon === 'true' ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer;">
-            Last Run Won
+        <div class="pse-field">
+          <label class="pse-checkbox">
+            <input type="checkbox" id="pse-last-run-won" ${lastRunWon === 'true' ? 'checked' : ''}> Last Run Won
           </label>
         </div>
         <button class="pse-btn pse-btn-primary" id="pse-save-settings">Save Settings</button>
@@ -2318,10 +2042,7 @@
   document.addEventListener('keydown', e => {
     if (e.ctrlKey && e.shiftKey && e.key === 'E') {
       e.preventDefault();
-      gui.classList.toggle('hidden');
-      if (!gui.classList.contains('hidden')) {
-        renderContent();
-      }
+      toggleGui();
     }
   });
 
