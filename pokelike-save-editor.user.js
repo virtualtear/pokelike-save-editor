@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pokelike Save Editor
 // @namespace    https://github.com/virtualtear/pokelike-save-editor
-// @version      2.7.0
+// @version      2.7.1
 // @description  Save editor for Pokelike. Originally made by neol1no, continued by virtualtear.
 // @author       neol1no (original), virtualtear (continued)
 // @homepageURL  https://github.com/virtualtear/pokelike-save-editor
@@ -223,7 +223,9 @@
   // ─── Styles ──────────────────────────────────────────────────────────────────
   const style = document.createElement('style');
   style.textContent = `
-    * { box-sizing: border-box; }
+    #pse-gui, #pse-gui *, .pse-modal, .pse-modal *, .pse-item-tip, .pse-item-tip * {
+      box-sizing: border-box;
+    }
 
     #pse-gui {
       position: fixed !important; top: 20px !important; right: 20px !important;
@@ -1088,12 +1090,13 @@
 
   // ─── Hall of Fame ────────────────────────────────────────────────────────────
   const MAX_TEAM_SIZE = 6;
-  const TOWER_REGIONS = GENERATIONS.slice(0, 5).map(g => g.region);
+  // Battle Tower stages 1-6 are the regions of Gen 1-6
+  const TOWER_REGIONS = GENERATIONS.slice(0, 6).map(g => g.region);
 
   // The game trims saved team members to speciesId, level, nickname, isShiny
   // and heldItem, so sprites and names have to come from the species
   const teamSpriteUrl = member => spriteUrl(member.speciesId, member.isShiny);
-  const memberTitle = member => `${member.nickname || speciesName(member.speciesId)} Lv.${member.level}`;
+  const memberTitle = member => `${escapeHtml(member.nickname || speciesName(member.speciesId))} Lv.${member.level}`;
 
   // Item texts contain quotes and ampersands, which would break HTML attributes
   const escapeHtml = text => String(text ?? '')
@@ -1274,7 +1277,7 @@
     });
 
     modal.querySelector('#pse-add-team').addEventListener('click', () => {
-      if (run.team.length >= MAX_TEAM_SIZE) {
+      if (readJson(HOF_KEY, [])[idx].team.length >= MAX_TEAM_SIZE) {
         alert(`Team is full (${MAX_TEAM_SIZE}/${MAX_TEAM_SIZE})`);
         return;
       }
@@ -1358,7 +1361,7 @@
       <img class="pse-sprite-lg" src="${teamSpriteUrl(member)}">
       <div class="pse-field">
         <label class="pse-label" for="pse-nickname">Nickname (optional)</label>
-        <input type="text" class="pse-input" id="pse-nickname" value="${member.nickname || ''}" placeholder="${name}">
+        <input type="text" class="pse-input" id="pse-nickname" value="${escapeHtml(member.nickname)}" placeholder="${name}">
       </div>
       <div class="pse-field">
         <label class="pse-label" for="pse-level">Level</label>
