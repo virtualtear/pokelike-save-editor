@@ -22,9 +22,11 @@ You need a browser extension called Tampermonkey. It runs small scripts like thi
 
 Click the ⚙️ button in the bottom right corner of the game, or press `Ctrl` + `Shift` + `E`. The editor opens on top of the game. Click the same button again, or the ✕, to close it.
 
+The first time, the editor downloads the list of Pokémon from [PokeAPI](https://pokeapi.co/). It keeps a copy and only downloads it again once a week.
+
 The tabs at the top of the editor:
 
-- **Pokédex:** click a Pokémon to mark it as caught. Click it again to remove it. Use the search box to find one by name.
+- **Pokédex:** all Pokémon from Gen 1 to Gen 7, grouped by generation. Each generation shows how many you have caught. Click a Pokémon to mark it as caught, and click it again to remove it. "Catch all" marks a whole generation as caught, "Clear" removes it. Click a generation's name to fold it away. To find what you still need, use the search box, pick one generation from the dropdown, or tick "Missing only".
 - **Shiny Dex:** works the same way, for shiny Pokémon.
 - **Hall of Fame:** your finished runs, newest first. Click a run to edit it, or click "+ Add New Run" to make a new one. You can pick Championship or Battle Tower (with a region), turn Nuzlocke on or off, and add up to 6 Pokémon. Click a Pokémon in the team to change its nickname, level, shiny status or held item. "Delete" removes the run for good.
 - **Stat Buffs:** lists the Pokémon from your Hall of Fame. Click one to give it buffs. Each stat can get 0 to 10 buffs, and each buff adds 10%. Buffs count for the whole evolution line, so buffing Charmander also buffs Charizard. You start with 10 points and get 10 more for every Battle Tower stage you have cleared, up to 50. "Cheat Mode" removes that limit. The "Battle Tower only" box hides legendary Pokémon from the list.
@@ -39,6 +41,7 @@ When the editor is running, the stage complete screen in the Battle Tower says "
 
 - **No ⚙️ button:** check that Tampermonkey is turned on and the script is enabled in it. Make sure you are on pokelike2.xyz. For pokelike.xyz, use [the original version](https://greasyfork.org/en/scripts/575546-pokelike-save-editor). In Chrome and Edge, check step 2 of the install guide.
 - **My changes don't show up in the game:** click "Save & Reload" in the editor.
+- **"Couldn't load Pokémon data":** the editor could not reach PokeAPI. Check your internet connection and click "Retry".
 
 ## Updates
 
@@ -46,6 +49,6 @@ Tampermonkey checks for new versions of the script and installs them for you. To
 
 ## Credits and license
 
-Made by neol1no, continued by virtualtear. Released under the MIT license.
+Made by neol1no, continued by virtualtear. Pokémon names, types and evolutions come from [PokeAPI](https://pokeapi.co/). Released under the MIT license.
 
 This is a fan project. It is not connected to Pokelike, Nintendo, Game Freak or The Pokémon Company.
