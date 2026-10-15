@@ -25,19 +25,18 @@
   };
 
   // ─── Items ───────────────────────────────────────────────────────────────────
-  const ITEMS = [
-    // Stat boost items
-    { id: 'choice_band', name: 'Choice Band', icon: '🎀', desc: '+40% physical damage, -20% DEF' },
-    { id: 'choice_specs', name: 'Choice Specs', icon: '👓', desc: '+40% special damage, -20% Sp.Def' },
-    { id: 'wise_glasses', name: 'Wise Glasses', icon: '🔬', desc: '+20% special damage' },
-    { id: 'muscle_band', name: 'Muscle Band', icon: '💪', desc: '+20% physical damage' },
-    { id: 'eviolite', name: 'Eviolite', icon: '💎', desc: '+50% DEF & Sp.Def if holder is not fully evolved' },
+  // Pokelike gives items its own effects, so they come from the game, not from PokeAPI.
+  // Copy of the game's ITEM_POOL (js/data.js), used when the game's list is not reachable
+  const BUILTIN_ITEMS = [
     { id: 'lucky_egg', name: 'Lucky Egg', icon: '🥚', desc: '30% chance: holder gains +1 extra level after each battle', minMap: 4 },
+    { id: 'life_orb', name: 'Life Orb', icon: '🔮', desc: '+30% damage; holder loses 10% max HP per hit' },
+    { id: 'choice_band', name: 'Choice Band', icon: '🎀', desc: '+40% physical damage, -20% DEF' },
+    { id: 'choice_specs', name: 'Choice Specs', icon: '👓', desc: '+30% special damage' },
+    { id: 'metronome', name: 'Metronome', icon: '🎵', desc: 'Dual-type holder uses its OTHER type for attacks; +20% damage on all moves' },
     { id: 'scope_lens', name: 'Scope Lens', icon: '🔭', desc: '20% crit chance (+50% damage on crit)' },
-    { id: 'life_orb', name: 'Life Orb', icon: '🔮', desc: '+30% damage on all moves' },
     { id: 'rocky_helmet', name: 'Rocky Helmet', icon: '⛑️', desc: 'Attacker takes 12% of their max HP on each hit' },
     { id: 'shell_bell', name: 'Shell Bell', icon: '🐚', desc: 'Heal 15% of damage dealt' },
-    // Type-boosting items
+    { id: 'eviolite', name: 'Eviolite', icon: '💎', desc: 'stops evolutions, if the pokemon is not the final stage it gets +50% DEF & +50% Sp. DEF' },
     { id: 'sharp_beak', name: 'Sharp Beak', icon: '🦅', desc: '+50% Flying move damage' },
     { id: 'charcoal', name: 'Charcoal', icon: '🔥', desc: '+50% Fire move damage' },
     { id: 'mystic_water', name: 'Mystic Water', icon: '💧', desc: '+50% Water move damage' },
@@ -52,17 +51,36 @@
     { id: 'poison_barb', name: 'Poison Barb', icon: '☠️', desc: '+50% Poison move damage', minMap: 4 },
     { id: 'spell_tag', name: 'Spell Tag', icon: '👻', desc: '+50% Ghost move damage', minMap: 4 },
     { id: 'silk_scarf', name: 'Silk Scarf', icon: '🤍', desc: '+50% Normal move damage' },
-    // Stat items
+    { id: 'metal_coat', name: 'Metal Coat', icon: '🔩', desc: '+50% Steel move damage', minMap: 4 },
+    { id: 'black_glasses', name: 'Black Glasses', icon: '🕶️', desc: '+50% Dark move damage', minMap: 4 },
+    { id: 'pixie_plate', name: 'Pixie Plate', icon: '🧚', desc: '+50% Fairy move damage', minMap: 4 },
+    { id: 'never_melt_ice', name: 'Never-Melt Ice', icon: '❄️', desc: '+50% Ice move damage', minMap: 4 },
     { id: 'assault_vest', name: 'Assault Vest', icon: '🦺', desc: '+50% Sp.Def' },
     { id: 'choice_scarf', name: 'Choice Scarf', icon: '🧣', desc: '+50% Speed' },
-    // Battle effect items
     { id: 'leftovers', name: 'Leftovers', icon: '🍃', desc: 'Restore 10% max HP each round' },
-    { id: 'expert_belt', name: 'Expert Belt', icon: '🥊', desc: '+30% damage on super effective hits' },
-    { id: 'focus_band', name: 'Focus Band', icon: '🩹', desc: '20% chance to survive a KO with 1 HP' },
+    { id: 'expert_belt', name: 'Expert Belt', icon: '🥊', desc: '+100% damage on super effective hits' },
     { id: 'focus_sash', name: 'Focus Sash', icon: '🎗️', desc: 'If at full HP, guaranteed to survive any hit with 1 HP' },
     { id: 'wide_lens', name: 'Wide Lens', icon: '🔎', desc: '+20% damage on all moves' },
-    { id: 'air_balloon', name: 'Air Balloon', icon: '🎈', desc: 'Immune to Ground-type moves' },
+    { id: 'quick_claw', name: 'Quick Claw', icon: '🪝', desc: '50% chance to attack first regardless of speed' },
+    { id: 'kings_rock', name: "King's Rock", icon: '👑', desc: '30% chance to flinch the target on a hit' },
+    { id: 'lagging_tail', name: 'Lagging Tail', icon: '🐌', desc: 'Always moves last, but +100% move damage' },
+    { id: 'adrenaline_orb', name: 'Adrenaline Orb', icon: '⚡', desc: 'When YOU land a SUPER-EFFECTIVE hit (×2+): +1 ATK / +1 Sp.Atk this battle' },
+    { id: 'red_card', name: 'Red Card', icon: '🟥', desc: 'Take 50% less damage from super-effective hits' },
+    { id: 'loaded_dice', name: 'Loaded Dice', icon: '🎲', desc: 'Start of each battle: 37% chance for +2 to ATK/DEF/Sp.Atk/Sp.Def/Speed, else -1', iconUrl: 'https://api.pokelike2.xyz/sprites/items/loaded_dice.png', gen2Only: true },
   ];
+
+  // Held items the game can hand out. ITEM_POOL is a top-level const in the
+  // game's scripts, reachable by name like ACHIEVEMENTS
+  function getItemList() {
+    try {
+      if (typeof ITEM_POOL !== 'undefined' && Array.isArray(ITEM_POOL) && ITEM_POOL.length) {
+        return ITEM_POOL;
+      }
+    } catch {
+      // Not reachable from where this script runs
+    }
+    return BUILTIN_ITEMS;
+  }
 
   // ─── Pokémon Data (PokeAPI) ──────────────────────────────────────────────────
   // The game's Pokédex stops at #809, the end of Gen 7
@@ -1059,6 +1077,11 @@
   function editTeamMember(runIdx, teamIdx) {
     const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
     const member = hof[runIdx].team[teamIdx];
+    const items = getItemList();
+    // Keep an item the game has since removed selectable, so saving does not drop it
+    const itemChoices = member.heldItem && !items.some(i => i.id === member.heldItem.id)
+      ? [...items, member.heldItem]
+      : items;
 
     const modal = document.createElement('div');
     modal.className = 'pse-modal';
@@ -1089,7 +1112,7 @@
           <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Held Item</label>
           <select id="pse-held-item" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #000; font-size: 14px; cursor: pointer;">
             <option value="">None</option>
-            ${ITEMS.map(item => `
+            ${itemChoices.map(item => `
               <option value="${item.id}" ${member.heldItem?.id === item.id ? 'selected' : ''}>
                 ${item.icon} ${item.name}
               </option>
@@ -1127,17 +1150,12 @@
         ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${member.speciesId}.png`
         : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${member.speciesId}.png`;
 
-      // Update held item
-      if (itemId) {
-        const item = ITEMS.find(i => i.id === itemId);
-        member.heldItem = {
-          id: item.id,
-          name: item.name,
-          icon: item.icon,
-          desc: item.desc || ''
-        };
-      } else {
+      // An unchanged item stays as saved. A new one is copied whole, because the
+      // game draws its icon from fields like iconUrl
+      if (!itemId) {
         member.heldItem = null;
+      } else if (itemId !== member.heldItem?.id) {
+        member.heldItem = { ...itemChoices.find(i => i.id === itemId) };
       }
 
       localStorage.setItem('poke_hall_of_fame', JSON.stringify(hof));

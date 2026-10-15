@@ -24,6 +24,8 @@ Click the ⚙️ button in the bottom right corner of the game, or press `Ctrl` 
 
 The first time, the editor downloads the list of Pokémon from [PokeAPI](https://pokeapi.co/). It keeps a copy and only downloads it again once a week.
 
+Held items and achievements come from the game itself, so new ones show up in the editor when the game adds them.
+
 The tabs at the top of the editor:
 
 - **Pokédex:** all Pokémon from Gen 1 to Gen 7, grouped by generation. Each generation shows how many you have caught. Click a Pokémon to mark it as caught, and click it again to remove it. "Catch all" marks a whole generation as caught, "Clear" removes it. Click a generation's name to fold it away. To find what you still need, search by name or number, pick one generation from the dropdown, or tick "Missing only".
