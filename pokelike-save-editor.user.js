@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pokelike Save Editor
 // @namespace    https://github.com/virtualtear/pokelike-save-editor
-// @version      2.4.0
+// @version      2.5.0
 // @description  Save editor for Pokelike. Originally made by neol1no, continued by virtualtear.
 // @author       neol1no (original), virtualtear (continued)
 // @homepageURL  https://github.com/virtualtear/pokelike-save-editor
@@ -248,6 +248,62 @@
     { id: 641, name: 'Tornadus' }, { id: 642, name: 'Thundurus' }, { id: 643, name: 'Reshiram' },
     { id: 644, name: 'Zekrom' }, { id: 645, name: 'Landorus' }, { id: 646, name: 'Kyurem' },
     { id: 647, name: 'Keldeo' }, { id: 648, name: 'Meloetta' }, { id: 649, name: 'Genesect' },
+    // Gen 6
+    { id: 650, name: 'Chespin' }, { id: 651, name: 'Quilladin' }, { id: 652, name: 'Chesnaught' },
+    { id: 653, name: 'Fennekin' }, { id: 654, name: 'Braixen' }, { id: 655, name: 'Delphox' },
+    { id: 656, name: 'Froakie' }, { id: 657, name: 'Frogadier' }, { id: 658, name: 'Greninja' },
+    { id: 659, name: 'Bunnelby' }, { id: 660, name: 'Diggersby' }, { id: 661, name: 'Fletchling' },
+    { id: 662, name: 'Fletchinder' }, { id: 663, name: 'Talonflame' }, { id: 664, name: 'Scatterbug' },
+    { id: 665, name: 'Spewpa' }, { id: 666, name: 'Vivillon' }, { id: 667, name: 'Litleo' },
+    { id: 668, name: 'Pyroar' }, { id: 669, name: 'Flabebe' }, { id: 670, name: 'Floette' },
+    { id: 671, name: 'Florges' }, { id: 672, name: 'Skiddo' }, { id: 673, name: 'Gogoat' },
+    { id: 674, name: 'Pancham' }, { id: 675, name: 'Pangoro' }, { id: 676, name: 'Furfrou' },
+    { id: 677, name: 'Espurr' }, { id: 678, name: 'Meowstic' }, { id: 679, name: 'Honedge' },
+    { id: 680, name: 'Doublade' }, { id: 681, name: 'Aegislash' }, { id: 682, name: 'Spritzee' },
+    { id: 683, name: 'Aromatisse' }, { id: 684, name: 'Swirlix' }, { id: 685, name: 'Slurpuff' },
+    { id: 686, name: 'Inkay' }, { id: 687, name: 'Malamar' }, { id: 688, name: 'Binacle' },
+    { id: 689, name: 'Barbaracle' }, { id: 690, name: 'Skrelp' }, { id: 691, name: 'Dragalge' },
+    { id: 692, name: 'Clauncher' }, { id: 693, name: 'Clawitzer' }, { id: 694, name: 'Helioptile' },
+    { id: 695, name: 'Heliolisk' }, { id: 696, name: 'Tyrunt' }, { id: 697, name: 'Tyrantrum' },
+    { id: 698, name: 'Amaura' }, { id: 699, name: 'Aurorus' }, { id: 700, name: 'Sylveon' },
+    { id: 701, name: 'Hawlucha' }, { id: 702, name: 'Dedenne' }, { id: 703, name: 'Carbink' },
+    { id: 704, name: 'Goomy' }, { id: 705, name: 'Sliggoo' }, { id: 706, name: 'Goodra' },
+    { id: 707, name: 'Klefki' }, { id: 708, name: 'Phantump' }, { id: 709, name: 'Trevenant' },
+    { id: 710, name: 'Pumpkaboo' }, { id: 711, name: 'Gourgeist' }, { id: 712, name: 'Bergmite' },
+    { id: 713, name: 'Avalugg' }, { id: 714, name: 'Noibat' }, { id: 715, name: 'Noivern' },
+    { id: 716, name: 'Xerneas' }, { id: 717, name: 'Yveltal' }, { id: 718, name: 'Zygarde' },
+    { id: 719, name: 'Diancie' }, { id: 720, name: 'Hoopa' }, { id: 721, name: 'Volcanion' },
+    // Gen 7
+    { id: 722, name: 'Rowlet' }, { id: 723, name: 'Dartrix' }, { id: 724, name: 'Decidueye' },
+    { id: 725, name: 'Litten' }, { id: 726, name: 'Torracat' }, { id: 727, name: 'Incineroar' },
+    { id: 728, name: 'Popplio' }, { id: 729, name: 'Brionne' }, { id: 730, name: 'Primarina' },
+    { id: 731, name: 'Pikipek' }, { id: 732, name: 'Trumbeak' }, { id: 733, name: 'Toucannon' },
+    { id: 734, name: 'Yungoos' }, { id: 735, name: 'Gumshoos' }, { id: 736, name: 'Grubbin' },
+    { id: 737, name: 'Charjabug' }, { id: 738, name: 'Vikavolt' }, { id: 739, name: 'Crabrawler' },
+    { id: 740, name: 'Crabominable' }, { id: 741, name: 'Oricorio' }, { id: 742, name: 'Cutiefly' },
+    { id: 743, name: 'Ribombee' }, { id: 744, name: 'Rockruff' }, { id: 745, name: 'Lycanroc' },
+    { id: 746, name: 'Wishiwashi' }, { id: 747, name: 'Mareanie' }, { id: 748, name: 'Toxapex' },
+    { id: 749, name: 'Mudbray' }, { id: 750, name: 'Mudsdale' }, { id: 751, name: 'Dewpider' },
+    { id: 752, name: 'Araquanid' }, { id: 753, name: 'Fomantis' }, { id: 754, name: 'Lurantis' },
+    { id: 755, name: 'Morelull' }, { id: 756, name: 'Shiinotic' }, { id: 757, name: 'Salandit' },
+    { id: 758, name: 'Salazzle' }, { id: 759, name: 'Stufful' }, { id: 760, name: 'Bewear' },
+    { id: 761, name: 'Bounsweet' }, { id: 762, name: 'Steenee' }, { id: 763, name: 'Tsareena' },
+    { id: 764, name: 'Comfey' }, { id: 765, name: 'Oranguru' }, { id: 766, name: 'Passimian' },
+    { id: 767, name: 'Wimpod' }, { id: 768, name: 'Golisopod' }, { id: 769, name: 'Sandygast' },
+    { id: 770, name: 'Palossand' }, { id: 771, name: 'Pyukumuku' }, { id: 772, name: 'Type-null' },
+    { id: 773, name: 'Silvally' }, { id: 774, name: 'Minior' }, { id: 775, name: 'Komala' },
+    { id: 776, name: 'Turtonator' }, { id: 777, name: 'Togedemaru' }, { id: 778, name: 'Mimikyu' },
+    { id: 779, name: 'Bruxish' }, { id: 780, name: 'Drampa' }, { id: 781, name: 'Dhelmise' },
+    { id: 782, name: 'Jangmo-o' }, { id: 783, name: 'Hakamo-o' }, { id: 784, name: 'Kommo-o' },
+    { id: 785, name: 'Tapu-koko' }, { id: 786, name: 'Tapu-lele' }, { id: 787, name: 'Tapu-bulu' },
+    { id: 788, name: 'Tapu-fini' }, { id: 789, name: 'Cosmog' }, { id: 790, name: 'Cosmoem' },
+    { id: 791, name: 'Solgaleo' }, { id: 792, name: 'Lunala' }, { id: 793, name: 'Nihilego' },
+    { id: 794, name: 'Buzzwole' }, { id: 795, name: 'Pheromosa' }, { id: 796, name: 'Xurkitree' },
+    { id: 797, name: 'Celesteela' }, { id: 798, name: 'Kartana' }, { id: 799, name: 'Guzzlord' },
+    { id: 800, name: 'Necrozma' }, { id: 801, name: 'Magearna' }, { id: 802, name: 'Marshadow' },
+    { id: 803, name: 'Poipole' }, { id: 804, name: 'Naganadel' }, { id: 805, name: 'Stakataka' },
+    { id: 806, name: 'Blacephalon' }, { id: 807, name: 'Zeraora' }, { id: 808, name: 'Meltan' },
+    { id: 809, name: 'Melmetal' },
   ];
 
   const ITEMS = [
@@ -297,6 +353,9 @@
     377,378,379,380,381,382,383,384,385,386,                         // Gen 3
     480,481,482,483,484,485,486,487,488,489,490,491,492,493,         // Gen 4
     494,638,639,640,641,642,643,644,645,646,647,648,649,             // Gen 5
+    716,717,718,719,720,721,                                         // Gen 6: Xerneas, Yveltal, Zygarde, Diancie, Hoopa, Volcanion
+    772,773,785,786,787,788,789,790,791,792,793,794,795,796,797,     // Gen 7
+    798,799,800,801,802,803,804,805,806,807,808,809,
   ];
   const LEGENDARY_ID_SET = new Set(LEGENDARY_IDS);
 
@@ -305,7 +364,7 @@
 
   // Build the evolution roots map from the game's evolution data
   function buildEvolutionRoots() {
-    // Gen 1-5 evolution chains (base -> stage1 -> stage2)
+    // Gen 1-7 evolution chains (base -> stage1 -> stage2)
     const chains = {
       // Kanto starters
       1: [2, 3], 4: [5, 6], 7: [8, 9],
@@ -317,6 +376,10 @@
       387: [388, 389], 390: [391, 392], 393: [394, 395],
       // Unova starters
       495: [496, 497], 498: [499, 500], 501: [502, 503],
+      // Kalos starters
+      650: [651, 652], 653: [654, 655], 656: [657, 658],
+      // Alola starters
+      722: [723, 724], 725: [726, 727], 728: [729, 730],
       // Other common chains
       10: [11, 12], 13: [14, 15], 16: [17, 18], 19: [20], 21: [22], 23: [24], 25: [26],
       27: [28], 29: [30, 31], 32: [33, 34], 35: [36], 37: [38], 39: [40], 41: [42, 169],
@@ -325,7 +388,7 @@
       77: [78], 79: [80, 199], 81: [82, 462], 84: [85], 86: [87], 88: [89], 90: [91],
       92: [93, 94], 95: [208], 96: [97], 98: [99], 100: [101], 102: [103], 104: [105],
       109: [110], 111: [112, 464], 116: [117, 230], 118: [119], 120: [121], 123: [212],
-      129: [130], 133: [134, 135, 136, 196, 197, 470, 471], 138: [139], 140: [141],
+      129: [130], 133: [134, 135, 136, 196, 197, 470, 471, 700], 138: [139], 140: [141],
       147: [148, 149], 161: [162], 163: [164], 165: [166], 167: [168], 170: [171],
       172: [25], 173: [35], 174: [39], 175: [176, 468], 177: [178], 179: [180, 181],
       183: [184], 187: [188, 189], 191: [192], 194: [195], 204: [205], 209: [210],
@@ -349,7 +412,14 @@
       570: [571], 572: [573], 574: [575, 576], 577: [578, 579], 580: [581], 582: [583, 584],
       585: [586], 588: [589], 590: [591], 592: [593], 595: [596], 597: [598], 599: [600, 601],
       602: [603, 604], 605: [606], 607: [608, 609], 610: [611, 612], 613: [614], 616: [617],
-      619: [620], 622: [623], 624: [625], 627: [628], 629: [630], 633: [634, 635], 636: [637]
+      619: [620], 622: [623], 624: [625], 627: [628], 629: [630], 633: [634, 635], 636: [637],
+      // Gen 6-7 chains
+      659: [660], 661: [662, 663], 664: [665, 666], 667: [668], 669: [670, 671], 672: [673],
+      674: [675], 677: [678], 679: [680, 681], 682: [683], 684: [685], 686: [687], 688: [689],
+      690: [691], 692: [693], 694: [695], 696: [697], 698: [699], 704: [705, 706], 708: [709],
+      710: [711], 712: [713], 714: [715], 731: [732, 733], 734: [735], 736: [737, 738],
+      739: [740], 742: [743], 744: [745], 747: [748], 749: [750], 751: [752], 753: [754],
+      755: [756], 757: [758], 759: [760], 761: [762, 763], 767: [768], 769: [770], 782: [783, 784]
     };
 
     // Build reverse mapping
