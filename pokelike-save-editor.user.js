@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pokelike Save Editor
 // @namespace    https://github.com/virtualtear/pokelike-save-editor
-// @version      2.6.0
+// @version      2.7.0
 // @description  Save editor for Pokelike. Originally made by neol1no, continued by virtualtear.
 // @author       neol1no (original), virtualtear (continued)
 // @homepageURL  https://github.com/virtualtear/pokelike-save-editor
@@ -2177,13 +2177,18 @@
         <select class="pse-select" id="pse-ach-group">
           ${ACHIEVEMENT_GROUPS.map(g => `<option value="${g.key}">${g.label}</option>`).join('')}
         </select>
+        <label class="pse-checkbox">
+          <input type="checkbox" id="pse-ach-missing-only"> Missing only
+        </label>
       </div>
       <div id="pse-ach-sections"></div>
     `;
 
     const sections = document.getElementById('pse-ach-sections');
     const groupSelect = document.getElementById('pse-ach-group');
+    const missingOnly = document.getElementById('pse-ach-missing-only');
     groupSelect.value = localStorage.getItem('pse_ach_group') || 'all';
+    missingOnly.checked = localStorage.getItem('pse_ach_missing_only') === 'true';
 
     function saveUnlocked(unlocked) {
       localStorage.setItem('poke_achievements', JSON.stringify([...unlocked]));
@@ -2195,11 +2200,12 @@
       document.getElementById('pse-ach-total').textContent =
         `${list.filter(a => unlocked.has(a.id)).length} / ${list.length}`;
 
-      sections.innerHTML = categories
+      const html = categories
         .filter(c => groupSelect.value === 'all' || c.group === groupSelect.value)
         .map(c => {
           const items = list.filter(a => a.category === c.key);
-          if (items.length === 0) return '';
+          const shown = items.filter(a => !(missingOnly.checked && unlocked.has(a.id)));
+          if (shown.length === 0) return '';
           const done = items.filter(a => unlocked.has(a.id)).length;
           return `
             <div class="pse-ach-section" data-category="${c.key}">
@@ -2209,11 +2215,13 @@
                 <button class="pse-btn pse-btn-danger pse-ach-lock-all">Lock all</button>
               </div>
               <div class="pse-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-                ${items.map(a => renderAchievementCard(a, unlocked.has(a.id))).join('')}
+                ${shown.map(a => renderAchievementCard(a, unlocked.has(a.id))).join('')}
               </div>
             </div>
           `;
         }).join('');
+
+      sections.innerHTML = html || '<div class="pse-empty">No achievements match.</div>';
     }
 
     sections.addEventListener('click', e => {
@@ -2240,6 +2248,10 @@
 
     groupSelect.addEventListener('change', () => {
       localStorage.setItem('pse_ach_group', groupSelect.value);
+      renderSections();
+    });
+    missingOnly.addEventListener('change', () => {
+      localStorage.setItem('pse_ach_missing_only', missingOnly.checked);
       renderSections();
     });
 
