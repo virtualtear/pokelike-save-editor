@@ -377,6 +377,11 @@
       cursor: pointer;
       user-select: none;
     }
+    .pse-ach-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 600;
+    }
     .pse-gen-arrow {
       display: inline-block;
       transition: transform 0.2s;
@@ -768,6 +773,11 @@
     renderGroups();
   }
 
+  // The game trims saved team members to speciesId, level, nickname, isShiny
+  // and heldItem, so sprites and names have to come from the species
+  const teamSpriteUrl = member => `${SPRITE_BASE}${member.isShiny ? 'shiny/' : ''}${member.speciesId}.png`;
+  const speciesName = id => POKEMON_BY_ID.get(id)?.name || dexNumber(id);
+
   function renderHallOfFame(container) {
     const hof = JSON.parse(localStorage.getItem('poke_hall_of_fame') || '[]');
 
@@ -798,7 +808,7 @@
             <button class="pse-btn pse-btn-danger pse-btn-sm" onclick="deleteHofRun(${idx})">Delete</button>
           </div>
           <div class="pse-hof-team">
-            ${run.team.map(p => `<img src="${p.spriteUrl}" alt="${p.name}" title="${p.name} Lv.${p.level}">`).join('')}
+            ${run.team.map(p => `<img src="${teamSpriteUrl(p)}" alt="${speciesName(p.speciesId)}" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}">`).join('')}
           </div>
         </div>
       `;
@@ -881,7 +891,7 @@
           <div id="pse-team-list" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
             ${run.team.map((p, i) => `
               <div style="position: relative; cursor: pointer;" onclick="editTeamMember(${idx}, ${i})">
-                <img src="${p.spriteUrl}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${p.nickname || p.name} Lv.${p.level}${p.isShiny ? ' ✨' : ''}${p.heldItem ? ' • ' + p.heldItem.icon : ''}">
+                <img src="${teamSpriteUrl(p)}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}${p.isShiny ? ' ✨' : ''}${p.heldItem ? ' • ' + p.heldItem.icon : ''}">
                 ${p.isShiny ? '<div style="position: absolute; top: 2px; left: 2px; font-size: 16px;">✨</div>' : ''}
                 ${p.heldItem ? `<div style="position: absolute; bottom: 2px; right: 2px; font-size: 14px;">${p.heldItem.icon}</div>` : ''}
               </div>
@@ -1032,7 +1042,7 @@
     if (teamList) {
       teamList.innerHTML = run.team.map((p, i) => `
         <div style="position: relative; cursor: pointer;" onclick="editTeamMember(${runIdx}, ${i})">
-          <img src="${p.spriteUrl}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${p.nickname || p.name} Lv.${p.level}${p.isShiny ? ' ✨' : ''}${p.heldItem ? ' • ' + p.heldItem.icon : ''}">
+          <img src="${teamSpriteUrl(p)}" style="width: 64px; height: 64px; image-rendering: pixelated;" title="${p.nickname || speciesName(p.speciesId)} Lv.${p.level}${p.isShiny ? ' ✨' : ''}${p.heldItem ? ' • ' + p.heldItem.icon : ''}">
           ${p.isShiny ? '<div style="position: absolute; top: 2px; left: 2px; font-size: 16px;">✨</div>' : ''}
           ${p.heldItem ? `<div style="position: absolute; bottom: 2px; right: 2px; font-size: 14px;">${p.heldItem.icon}</div>` : ''}
         </div>
@@ -1054,14 +1064,14 @@
     modal.className = 'pse-modal';
     modal.innerHTML = `
       <div class="pse-modal-box">
-        <div class="pse-modal-title">Edit ${member.name}</div>
+        <div class="pse-modal-title">Edit ${speciesName(member.speciesId)}</div>
         <div style="text-align: center; margin-bottom: 20px;">
-          <img src="${member.spriteUrl}" style="width: 96px; height: 96px; image-rendering: pixelated;">
+          <img src="${teamSpriteUrl(member)}" style="width: 96px; height: 96px; image-rendering: pixelated;">
         </div>
 
         <div style="margin-bottom: 16px;">
           <label style="display: block; margin-bottom: 8px; font-size: 13px; color: rgba(235, 235, 245, 0.7);">Nickname (optional)</label>
-          <input type="text" id="pse-nickname" value="${member.nickname || ''}" placeholder="${member.name}" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: rgba(235, 235, 245, 0.9); font-size: 14px;">
+          <input type="text" id="pse-nickname" value="${member.nickname || ''}" placeholder="${speciesName(member.speciesId)}" style="width: 100%; padding: 10px; background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: rgba(235, 235, 245, 0.9); font-size: 14px;">
         </div>
 
         <div style="margin-bottom: 16px;">
@@ -1677,7 +1687,38 @@
   }
 
   // ─── Achievements Data ───────────────────────────────────────────────────────
-  const ACHIEVEMENTS = [
+  // Labels are copied word for word from the game's achievements screen, em dashes
+  // included, because the game's translator only translates text it knows exactly
+  const ACHIEVEMENT_CATEGORIES = [
+    { key: 'normal', label: 'Gen 1 — Classic', group: 'g1' },
+    { key: 'gen1_nuz', label: 'Gen 1 — Nuzlocke', group: 'g1' },
+    { key: 'gen1_chal', label: 'Gen 1 — Challenges', group: 'g1' },
+    { key: 'gen2_norm', label: 'Gen 2 — Normal', group: 'g2' },
+    { key: 'gen2_nuz', label: 'Gen 2 — Nuzlocke', group: 'g2' },
+    { key: 'gen2_chal', label: 'Gen 2 — Challenges', group: 'g2' },
+    { key: 'gen3_norm', label: 'Gen 3 — Normal', group: 'g3' },
+    { key: 'gen3_nuz', label: 'Gen 3 — Nuzlocke', group: 'g3' },
+    { key: 'gen4_norm', label: 'Gen 4 — Normal', group: 'g4' },
+    { key: 'gen4_nuz', label: 'Gen 4 — Nuzlocke', group: 'g4' },
+    { key: 'gen5_norm', label: 'Gen 5 — Normal', group: 'g5' },
+    { key: 'gen5_nuz', label: 'Gen 5 — Nuzlocke', group: 'g5' },
+    { key: 'gen6_norm', label: 'Gen 6 — Normal', group: 'g6' },
+    { key: 'gen6_nuz', label: 'Gen 6 — Nuzlocke', group: 'g6' },
+    { key: 'gen7_norm', label: 'Gen 7 — Normal', group: 'g7' },
+    { key: 'gen7_nuz', label: 'Gen 7 — Nuzlocke', group: 'g7' },
+    { key: 'tower', label: 'Battle Tower', group: 'tower' },
+    { key: 'general', label: 'General', group: 'general' },
+  ];
+
+  const ACHIEVEMENT_GROUPS = [
+    { key: 'all', label: 'All regions' }, { key: 'g1', label: 'Kanto' }, { key: 'g2', label: 'Johto' },
+    { key: 'g3', label: 'Hoenn' }, { key: 'g4', label: 'Sinnoh' }, { key: 'g5', label: 'Unova' },
+    { key: 'g6', label: 'Kalos' }, { key: 'g7', label: 'Alola' }, { key: 'tower', label: 'Battle Tower' },
+    { key: 'general', label: 'General' },
+  ];
+
+  // Copy of the game's achievements, used when its own list is not reachable
+  const BUILTIN_ACHIEVEMENTS = [
     { id: 'gym_0', name: 'Boulder Basher', desc: 'Clear Map 1 and defeat Brock', icon: '🪨', category: 'normal' },
     { id: 'gym_1', name: 'Cascade Crusher', desc: 'Clear Map 2 and defeat Misty', icon: '💧', category: 'normal' },
     { id: 'gym_2', name: 'Thunder Tamer', desc: 'Clear Map 3 and defeat Lt. Surge', icon: '⚡', category: 'normal' },
@@ -1693,7 +1734,7 @@
     { id: 'starter_4', name: 'Fire Champion', desc: 'Choose Charmander as your starter and beat the game', icon: '🔥', category: 'normal' },
     { id: 'starter_7', name: 'Water Champion', desc: 'Choose Squirtle as your starter and beat the game', icon: '🌊', category: 'normal' },
     { id: 'solo_run', name: 'One is Enough', desc: 'Beat the game while keeping only 1 Pokémon on your team', icon: '⭐', category: 'normal' },
-    { id: 'nuzlocke_win', name: 'True Master', desc: 'Enable Nuzlocke Mode in Settings, then beat the game — if any Pokémon faints, it\'s gone for good', icon: '☠️', category: 'normal' },
+    { id: 'nuzlocke_win', name: 'True Master', desc: 'Beat the game in Nuzlocke Mode — every faint is permanent. No second chances.', icon: '☠️', category: 'normal' },
     { id: 'three_birds', name: 'Bird Keeper', desc: 'Beat the game with Articuno, Zapdos, and Moltres all on your team', icon: '🦅', category: 'normal' },
     { id: 'no_pokecenter', name: 'No Rest for the Wicked', desc: 'Beat the game without stopping at a Pokémon Center', icon: '🏃', category: 'normal' },
     { id: 'no_items', name: 'Minimalist', desc: 'Beat the game without picking up a single item', icon: '🎒', category: 'normal' },
@@ -1706,11 +1747,12 @@
     { id: 'endless_stage_3', name: 'Hoenn Champion', desc: 'Defeat Steven Stone and clear Stage 3 of Battle Tower', icon: '⚔️', category: 'tower' },
     { id: 'endless_stage_4', name: 'Sinnoh Champion', desc: 'Defeat Cynthia and clear Stage 4 of Battle Tower', icon: '💎', category: 'tower' },
     { id: 'endless_stage_5', name: 'Unova Champion', desc: 'Defeat N and clear Stage 5 of Battle Tower', icon: '🏅', category: 'tower' },
-    { id: 'starters_stage_1', name: 'Kanto Trio', desc: 'Win a Stage 1 run starting with each of Bulbasaur, Charmander, and Squirtle', icon: '🌿', category: 'tower' },
-    { id: 'starters_stage_2', name: 'Johto Trio', desc: 'Win a Stage 2 run starting with each of Chikorita, Cyndaquil, and Totodile', icon: '🍃', category: 'tower' },
-    { id: 'starters_stage_3', name: 'Hoenn Trio', desc: 'Win a Stage 3 run starting with each of Treecko, Torchic, and Mudkip', icon: '🌊', category: 'tower' },
-    { id: 'starters_stage_4', name: 'Sinnoh Trio', desc: 'Win a Stage 4 run starting with each of Turtwig, Chimchar, and Piplup', icon: '⛰️', category: 'tower' },
-    { id: 'starters_stage_5', name: 'Unova Trio', desc: 'Win a Stage 5 run starting with each of Snivy, Tepig, and Oshawott', icon: '🌀', category: 'tower' },
+    { id: 'endless_stage_6', name: 'Kalos Champion', desc: 'Defeat Diantha and clear Stage 6 of Battle Tower', icon: '🌟', category: 'tower' },
+    { id: 'starters_stage_1', name: 'Oak\'s Challenge', desc: 'Win a Stage 1 run starting with Bulbasaur, Charmander, or Squirtle', icon: '🌿', category: 'tower' },
+    { id: 'starters_stage_2', name: 'Elm\'s Challenge', desc: 'Win a Stage 2 run starting with Chikorita, Cyndaquil, or Totodile', icon: '🍃', category: 'tower' },
+    { id: 'starters_stage_3', name: 'Birch\'s Challenge', desc: 'Win a Stage 3 run starting with Treecko, Torchic, or Mudkip', icon: '🌊', category: 'tower' },
+    { id: 'starters_stage_4', name: 'Rowan\'s Challenge', desc: 'Win a Stage 4 run starting with Turtwig, Chimchar, or Piplup', icon: '⛰️', category: 'tower' },
+    { id: 'starters_stage_5', name: 'Juniper\'s Challenge', desc: 'Win a Stage 5 run starting with Snivy, Tepig, or Oshawott', icon: '🌀', category: 'tower' },
     { id: 'pokedex_complete', name: 'Gotta Catch \'Em All', desc: 'Catch all Gen 1 Pokémon across any number of runs', icon: '📖', category: 'general' },
     { id: 'shinydex_complete', name: 'Shiny Hunter', desc: 'Catch a shiny version of every Gen 1 Pokémon', icon: '✨', category: 'general' },
     { id: 'shinydex_all', name: 'Ultimate Shiny Hunter', desc: 'Catch a shiny version of every Pokémon across all gens', icon: '🌟', category: 'general' },
@@ -1718,77 +1760,268 @@
     { id: 'pokedex_gen3', name: 'Hoenn Completionist', desc: 'Catch all Gen 3 Pokémon across any number of runs', icon: '📘', category: 'general' },
     { id: 'pokedex_gen4', name: 'Sinnoh Completionist', desc: 'Catch all Gen 4 Pokémon across any number of runs', icon: '📙', category: 'general' },
     { id: 'pokedex_gen5', name: 'Unova Completionist', desc: 'Catch all Gen 5 Pokémon across any number of runs', icon: '📕', category: 'general' },
+    { id: 'pokedex_gen6', name: 'Kalos Completionist', desc: 'Catch all Gen 6 Pokémon across any number of runs', icon: '📔', category: 'general' },
+    { id: 'pokedex_gen7', name: 'Alola Completionist', desc: 'Catch all Gen 7 Pokémon across any number of runs', icon: '📔', category: 'general' },
     { id: 'max_stats_1', name: 'First Peak', desc: 'Max out 1 stat on a single Pokémon', icon: '📈', category: 'general' },
     { id: 'max_stats_2', name: 'Double Peak', desc: 'Max out 2 stats on a single Pokémon', icon: '📊', category: 'general' },
     { id: 'max_stats_3', name: 'Triple Peak', desc: 'Max out 3 stats on a single Pokémon', icon: '🔝', category: 'general' },
     { id: 'max_stats_4', name: 'Quad Peak', desc: 'Max out 4 stats on a single Pokémon', icon: '💪', category: 'general' },
-    { id: 'max_stats_all', name: 'Perfect Specimen', desc: 'Max out all 6 stats on a single Pokémon', icon: '🏅', category: 'general' },
+    { id: 'max_stats_all', name: 'Perfect Specimen', desc: 'Max out all 5 stats on a single Pokémon', icon: '🏅', category: 'general' },
     { id: 'shinydex_100', name: 'Shiny Spark', desc: 'Catch 100 different shiny Pokémon', icon: '⭐', category: 'general' },
     { id: 'shinydex_200', name: 'Shiny Flash', desc: 'Catch 200 different shiny Pokémon', icon: '💥', category: 'general' },
     { id: 'shinydex_300', name: 'Shiny Blaze', desc: 'Catch 300 different shiny Pokémon', icon: '🔥', category: 'general' },
     { id: 'shinydex_400', name: 'Shiny Storm', desc: 'Catch 400 different shiny Pokémon', icon: '⚡', category: 'general' },
     { id: 'shinydex_500', name: 'Shiny Legend', desc: 'Catch 500 different shiny Pokémon', icon: '💎', category: 'general' },
     { id: 'shinydex_600', name: 'Shiny Immortal', desc: 'Catch 600 different shiny Pokémon', icon: '👑', category: 'general' },
+    { id: 'g1_nuz_grass', name: 'Kanto Survivor: Grass', desc: 'Beat a Gen 1 Nuzlocke run with Bulbasaur as your starter', icon: '🌱', category: 'gen1_nuz' },
+    { id: 'g1_nuz_fire', name: 'Kanto Survivor: Fire', desc: 'Beat a Gen 1 Nuzlocke run with Charmander as your starter', icon: '🔥', category: 'gen1_nuz' },
+    { id: 'g1_nuz_water', name: 'Kanto Survivor: Water', desc: 'Beat a Gen 1 Nuzlocke run with Squirtle as your starter', icon: '🌊', category: 'gen1_nuz' },
+    { id: 'g1_nuz_clear', name: 'Kanto Nuzlocke', desc: 'Beat a Gen 1 Nuzlocke run', icon: '☠️', category: 'gen1_nuz' },
+    { id: 'g1_nuz_nocenter', name: 'Kanto Nuzlocke Ironman', desc: 'Beat a Gen 1 Nuzlocke run without using a Pokémon Center', icon: '🏃', category: 'gen1_nuz' },
+    { id: 'g1_monotype', name: 'Kanto Type Master', desc: 'Beat Gen 1 with a team that all shares a single type', icon: '🔣', category: 'gen1_chal' },
+    { id: 'g1_shiny_squad', name: 'Kanto Shiny Squad', desc: 'Beat Gen 1 with every Pokémon on your team shiny', icon: '💫', category: 'gen1_chal' },
+    { id: 'g1_single_stage', name: 'Kanto Purist', desc: 'Beat Gen 1 with a team of Pokémon that never evolve', icon: '🥚', category: 'gen1_chal' },
+    { id: 'g2_grass', name: 'Johto Grass Champion', desc: 'Beat Gen 2 with Chikorita as your starter', icon: '🌱', category: 'gen2_norm' },
+    { id: 'g2_fire', name: 'Johto Fire Champion', desc: 'Beat Gen 2 with Cyndaquil as your starter', icon: '🔥', category: 'gen2_norm' },
+    { id: 'g2_water', name: 'Johto Water Champion', desc: 'Beat Gen 2 with Totodile as your starter', icon: '🌊', category: 'gen2_norm' },
+    { id: 'g2_gym_0', name: 'Zephyr Silencer', desc: 'Clear Map 1 and defeat Falkner', icon: '🦅', category: 'gen2_norm' },
+    { id: 'g2_gym_1', name: 'Hive Smasher', desc: 'Clear Map 2 and defeat Bugsy', icon: '🐛', category: 'gen2_norm' },
+    { id: 'g2_gym_2', name: 'Plain Pounder', desc: 'Clear Map 3 and defeat Whitney', icon: '⚪', category: 'gen2_norm' },
+    { id: 'g2_gym_3', name: 'Fog Buster', desc: 'Clear Map 4 and defeat Morty', icon: '👻', category: 'gen2_norm' },
+    { id: 'g2_gym_4', name: 'Storm Smasher', desc: 'Clear Map 5 and defeat Chuck', icon: '🥊', category: 'gen2_norm' },
+    { id: 'g2_gym_5', name: 'Mineral Crusher', desc: 'Clear Map 6 and defeat Jasmine', icon: '⚙️', category: 'gen2_norm' },
+    { id: 'g2_gym_6', name: 'Glacier Breaker', desc: 'Clear Map 7 and defeat Pryce', icon: '❄️', category: 'gen2_norm' },
+    { id: 'g2_gym_7', name: 'Rising Tamer', desc: 'Clear Map 8 and defeat Clair', icon: '🐉', category: 'gen2_norm' },
+    { id: 'g2_nuz_grass', name: 'Johto Survivor: Grass', desc: 'Beat a Gen 2 Nuzlocke run with Chikorita as your starter', icon: '🌱', category: 'gen2_nuz' },
+    { id: 'g2_nuz_fire', name: 'Johto Survivor: Fire', desc: 'Beat a Gen 2 Nuzlocke run with Cyndaquil as your starter', icon: '🔥', category: 'gen2_nuz' },
+    { id: 'g2_nuz_water', name: 'Johto Survivor: Water', desc: 'Beat a Gen 2 Nuzlocke run with Totodile as your starter', icon: '🌊', category: 'gen2_nuz' },
+    { id: 'g2_nuz_clear', name: 'Johto Nuzlocke', desc: 'Beat a Gen 2 Nuzlocke run', icon: '☠️', category: 'gen2_nuz' },
+    { id: 'g2_nocenter', name: 'Johto Ironman', desc: 'Beat Gen 2 without using a Pokémon Center (any mode)', icon: '🏃', category: 'gen2_chal' },
+    { id: 'g2_norival', name: 'Lone Survivor', desc: 'Beat Gen 2 without ever defeating your rival (any mode)', icon: '🚫', category: 'gen2_chal' },
+    { id: 'g2_monotype', name: 'Johto Type Master', desc: 'Beat Gen 2 with a team that all shares a single type', icon: '🔣', category: 'gen2_chal' },
+    { id: 'g2_shiny_squad', name: 'Johto Shiny Squad', desc: 'Beat Gen 2 with every Pokémon on your team shiny', icon: '💫', category: 'gen2_chal' },
+    { id: 'g2_single_stage', name: 'Johto Purist', desc: 'Beat Gen 2 with a team of Pokémon that never evolve', icon: '🥚', category: 'gen2_chal' },
+    { id: 'g2_no_gen2', name: 'Time Traveler', desc: 'Beat the Gen 2 Elite Four without a Gen 2 Pokémon on your team', icon: '🧭', category: 'gen2_chal' },
+    { id: 'g3_grass', name: 'Hoenn Grass Champion', desc: 'Beat Gen 3 with Treecko as your starter', icon: '🌱', category: 'gen3_norm' },
+    { id: 'g3_fire', name: 'Hoenn Fire Champion', desc: 'Beat Gen 3 with Torchic as your starter', icon: '🔥', category: 'gen3_norm' },
+    { id: 'g3_water', name: 'Hoenn Water Champion', desc: 'Beat Gen 3 with Mudkip as your starter', icon: '🌊', category: 'gen3_norm' },
+    { id: 'g3_gym_0', name: 'Stone Splitter', desc: 'Clear Map 1 and defeat Roxanne', icon: '🪨', category: 'gen3_norm' },
+    { id: 'g3_gym_1', name: 'Knuckle Buster', desc: 'Clear Map 2 and defeat Brawly', icon: '🥊', category: 'gen3_norm' },
+    { id: 'g3_gym_2', name: 'Dynamo Disruptor', desc: 'Clear Map 3 and defeat Wattson', icon: '⚡', category: 'gen3_norm' },
+    { id: 'g3_gym_3', name: 'Heat Handler', desc: 'Clear Map 4 and defeat Flannery', icon: '🌋', category: 'gen3_norm' },
+    { id: 'g3_gym_4', name: 'Balance Breaker', desc: 'Clear Map 5 and defeat Norman', icon: '⚪', category: 'gen3_norm' },
+    { id: 'g3_gym_5', name: 'Feather Fighter', desc: 'Clear Map 6 and defeat Winona', icon: '🦅', category: 'gen3_norm' },
+    { id: 'g3_gym_6', name: 'Mind Bender', desc: 'Clear Map 7 and defeat Tate & Liza', icon: '🔮', category: 'gen3_norm' },
+    { id: 'g3_gym_7', name: 'Rain Ruler', desc: 'Clear Map 8 and defeat Wallace', icon: '🌊', category: 'gen3_norm' },
+    { id: 'g3_nuz_grass', name: 'Hoenn Survivor: Grass', desc: 'Beat a Gen 3 Nuzlocke run with Treecko as your starter', icon: '🌱', category: 'gen3_nuz' },
+    { id: 'g3_nuz_fire', name: 'Hoenn Survivor: Fire', desc: 'Beat a Gen 3 Nuzlocke run with Torchic as your starter', icon: '🔥', category: 'gen3_nuz' },
+    { id: 'g3_nuz_water', name: 'Hoenn Survivor: Water', desc: 'Beat a Gen 3 Nuzlocke run with Mudkip as your starter', icon: '🌊', category: 'gen3_nuz' },
+    { id: 'g3_nuz_clear', name: 'Hoenn Nuzlocke', desc: 'Beat a Gen 3 Nuzlocke run', icon: '☠️', category: 'gen3_nuz' },
+    { id: 'g4_grass', name: 'Sinnoh Grass Champion', desc: 'Beat Gen 4 with Turtwig as your starter', icon: '🌱', category: 'gen4_norm' },
+    { id: 'g4_fire', name: 'Sinnoh Fire Champion', desc: 'Beat Gen 4 with Chimchar as your starter', icon: '🔥', category: 'gen4_norm' },
+    { id: 'g4_water', name: 'Sinnoh Water Champion', desc: 'Beat Gen 4 with Piplup as your starter', icon: '🌊', category: 'gen4_norm' },
+    { id: 'g4_gym_0', name: 'Coal Crusher', desc: 'Clear Map 1 and defeat Roark', icon: '🪨', category: 'gen4_norm' },
+    { id: 'g4_gym_1', name: 'Forest Fighter', desc: 'Clear Map 2 and defeat Gardenia', icon: '🌿', category: 'gen4_norm' },
+    { id: 'g4_gym_2', name: 'Cobble Crusher', desc: 'Clear Map 3 and defeat Maylene', icon: '🥊', category: 'gen4_norm' },
+    { id: 'g4_gym_3', name: 'Fen Fighter', desc: 'Clear Map 4 and defeat Crasher Wake', icon: '🌊', category: 'gen4_norm' },
+    { id: 'g4_gym_4', name: 'Relic Raider', desc: 'Clear Map 5 and defeat Fantina', icon: '👻', category: 'gen4_norm' },
+    { id: 'g4_gym_5', name: 'Mine Master', desc: 'Clear Map 6 and defeat Byron', icon: '⚙️', category: 'gen4_norm' },
+    { id: 'g4_gym_6', name: 'Icicle Breaker', desc: 'Clear Map 7 and defeat Candice', icon: '❄️', category: 'gen4_norm' },
+    { id: 'g4_gym_7', name: 'Beacon Breaker', desc: 'Clear Map 8 and defeat Volkner', icon: '⚡', category: 'gen4_norm' },
+    { id: 'g4_nuz_grass', name: 'Sinnoh Survivor: Grass', desc: 'Beat a Gen 4 Nuzlocke run with Turtwig as your starter', icon: '🌱', category: 'gen4_nuz' },
+    { id: 'g4_nuz_fire', name: 'Sinnoh Survivor: Fire', desc: 'Beat a Gen 4 Nuzlocke run with Chimchar as your starter', icon: '🔥', category: 'gen4_nuz' },
+    { id: 'g4_nuz_water', name: 'Sinnoh Survivor: Water', desc: 'Beat a Gen 4 Nuzlocke run with Piplup as your starter', icon: '🌊', category: 'gen4_nuz' },
+    { id: 'g4_nuz_clear', name: 'Sinnoh Nuzlocke', desc: 'Beat a Gen 4 Nuzlocke run', icon: '☠️', category: 'gen4_nuz' },
+    { id: 'g5_grass', name: 'Unova Grass Champion', desc: 'Beat Gen 5 with Snivy as your starter', icon: '🌱', category: 'gen5_norm' },
+    { id: 'g5_fire', name: 'Unova Fire Champion', desc: 'Beat Gen 5 with Tepig as your starter', icon: '🔥', category: 'gen5_norm' },
+    { id: 'g5_water', name: 'Unova Water Champion', desc: 'Beat Gen 5 with Oshawott as your starter', icon: '🌊', category: 'gen5_norm' },
+    { id: 'g5_gym_0', name: 'Trio Tamer', desc: 'Clear Map 1 and defeat Chili', icon: '🎯', category: 'gen5_norm' },
+    { id: 'g5_gym_1', name: 'Basic Buster', desc: 'Clear Map 2 and defeat Lenora', icon: '⚪', category: 'gen5_norm' },
+    { id: 'g5_gym_2', name: 'Insect Slayer', desc: 'Clear Map 3 and defeat Burgh', icon: '🐛', category: 'gen5_norm' },
+    { id: 'g5_gym_3', name: 'Bolt Breaker', desc: 'Clear Map 4 and defeat Elesa', icon: '⚡', category: 'gen5_norm' },
+    { id: 'g5_gym_4', name: 'Quake Queller', desc: 'Clear Map 5 and defeat Clay', icon: '🌍', category: 'gen5_norm' },
+    { id: 'g5_gym_5', name: 'Jet Fighter', desc: 'Clear Map 6 and defeat Skyla', icon: '🦅', category: 'gen5_norm' },
+    { id: 'g5_gym_6', name: 'Freeze Fighter', desc: 'Clear Map 7 and defeat Brycen', icon: '❄️', category: 'gen5_norm' },
+    { id: 'g5_gym_7', name: 'Legend Slayer', desc: 'Clear Map 8 and defeat Drayden', icon: '🐉', category: 'gen5_norm' },
+    { id: 'g5_nuz_grass', name: 'Unova Survivor: Grass', desc: 'Beat a Gen 5 Nuzlocke run with Snivy as your starter', icon: '🌱', category: 'gen5_nuz' },
+    { id: 'g5_nuz_fire', name: 'Unova Survivor: Fire', desc: 'Beat a Gen 5 Nuzlocke run with Tepig as your starter', icon: '🔥', category: 'gen5_nuz' },
+    { id: 'g5_nuz_water', name: 'Unova Survivor: Water', desc: 'Beat a Gen 5 Nuzlocke run with Oshawott as your starter', icon: '🌊', category: 'gen5_nuz' },
+    { id: 'g5_nuz_clear', name: 'Unova Nuzlocke', desc: 'Beat a Gen 5 Nuzlocke run', icon: '☠️', category: 'gen5_nuz' },
+    { id: 'g6_grass', name: 'Kalos Grass Champion', desc: 'Beat Gen 6 with Chespin as your starter', icon: '🌱', category: 'gen6_norm' },
+    { id: 'g6_fire', name: 'Kalos Fire Champion', desc: 'Beat Gen 6 with Fennekin as your starter', icon: '🔥', category: 'gen6_norm' },
+    { id: 'g6_water', name: 'Kalos Water Champion', desc: 'Beat Gen 6 with Froakie as your starter', icon: '🌊', category: 'gen6_norm' },
+    { id: 'g6_gym_0', name: 'Bug Buster', desc: 'Clear Map 1 and defeat Viola', icon: '🐛', category: 'gen6_norm' },
+    { id: 'g6_gym_1', name: 'Cliff Climber', desc: 'Clear Map 2 and defeat Grant', icon: '🪨', category: 'gen6_norm' },
+    { id: 'g6_gym_2', name: 'Rumble Ruler', desc: 'Clear Map 3 and defeat Korrina', icon: '🥊', category: 'gen6_norm' },
+    { id: 'g6_gym_3', name: 'Plant Pruner', desc: 'Clear Map 4 and defeat Ramos', icon: '🌿', category: 'gen6_norm' },
+    { id: 'g6_gym_4', name: 'Voltage Victor', desc: 'Clear Map 5 and defeat Clemont', icon: '⚡', category: 'gen6_norm' },
+    { id: 'g6_gym_5', name: 'Fairy Fighter', desc: 'Clear Map 6 and defeat Valerie', icon: '🧚', category: 'gen6_norm' },
+    { id: 'g6_gym_6', name: 'Psychic Puzzler', desc: 'Clear Map 7 and defeat Olympia', icon: '🔮', category: 'gen6_norm' },
+    { id: 'g6_gym_7', name: 'Iceberg Crusher', desc: 'Clear Map 8 and defeat Wulfric', icon: '❄️', category: 'gen6_norm' },
+    { id: 'g6_nuz_grass', name: 'Kalos Survivor: Grass', desc: 'Beat a Gen 6 Nuzlocke run with Chespin as your starter', icon: '🌱', category: 'gen6_nuz' },
+    { id: 'g6_nuz_fire', name: 'Kalos Survivor: Fire', desc: 'Beat a Gen 6 Nuzlocke run with Fennekin as your starter', icon: '🔥', category: 'gen6_nuz' },
+    { id: 'g6_nuz_water', name: 'Kalos Survivor: Water', desc: 'Beat a Gen 6 Nuzlocke run with Froakie as your starter', icon: '🌊', category: 'gen6_nuz' },
+    { id: 'g6_nuz_clear', name: 'Kalos Nuzlocke', desc: 'Beat a Gen 6 Nuzlocke run', icon: '☠️', category: 'gen6_nuz' },
+    { id: 'g7_grass', name: 'Alola Grass Champion', desc: 'Beat Gen 7 with Rowlet as your starter', icon: '🌱', category: 'gen7_norm' },
+    { id: 'g7_fire', name: 'Alola Fire Champion', desc: 'Beat Gen 7 with Litten as your starter', icon: '🔥', category: 'gen7_norm' },
+    { id: 'g7_water', name: 'Alola Water Champion', desc: 'Beat Gen 7 with Popplio as your starter', icon: '🌊', category: 'gen7_norm' },
+    { id: 'g7_gym_0', name: 'Trial Rookie', desc: 'Clear Map 1 and defeat Ilima', icon: '⚪', category: 'gen7_norm' },
+    { id: 'g7_gym_1', name: 'Wave Rider', desc: 'Clear Map 2 and defeat Lana', icon: '🌊', category: 'gen7_norm' },
+    { id: 'g7_gym_2', name: 'Ember Dancer', desc: 'Clear Map 3 and defeat Kiawe', icon: '🌋', category: 'gen7_norm' },
+    { id: 'g7_gym_3', name: 'Jungle Forager', desc: 'Clear Map 4 and defeat Mallow', icon: '🌿', category: 'gen7_norm' },
+    { id: 'g7_gym_4', name: 'Circuit Breaker', desc: 'Clear Map 5 and defeat Sophocles', icon: '⚡', category: 'gen7_norm' },
+    { id: 'g7_gym_5', name: 'Shadow Stalker', desc: 'Clear Map 6 and defeat Nanu', icon: '🌙', category: 'gen7_norm' },
+    { id: 'g7_gym_6', name: 'Enchanted Brush', desc: 'Clear Map 7 and defeat Mina', icon: '🎨', category: 'gen7_norm' },
+    { id: 'g7_gym_7', name: 'Desert Kahuna', desc: 'Clear Map 8 and defeat Hapu', icon: '🏜️', category: 'gen7_norm' },
+    { id: 'g7_nuz_grass', name: 'Alola Survivor: Grass', desc: 'Beat a Gen 7 Nuzlocke run with Rowlet as your starter', icon: '🌱', category: 'gen7_nuz' },
+    { id: 'g7_nuz_fire', name: 'Alola Survivor: Fire', desc: 'Beat a Gen 7 Nuzlocke run with Litten as your starter', icon: '🔥', category: 'gen7_nuz' },
+    { id: 'g7_nuz_water', name: 'Alola Survivor: Water', desc: 'Beat a Gen 7 Nuzlocke run with Popplio as your starter', icon: '🌊', category: 'gen7_nuz' },
+    { id: 'g7_nuz_clear', name: 'Alola Nuzlocke', desc: 'Beat a Gen 7 Nuzlocke run', icon: '☠️', category: 'gen7_nuz' },
+    { id: 'g1_wins_5', name: 'Kanto Veteran', desc: 'Win Gen 1 5 times (without Nuzlocke)', icon: '🏆', category: 'normal' },
+    { id: 'g1_wins_25', name: 'Kanto Legend', desc: 'Win Gen 1 25 times (without Nuzlocke)', icon: '👑', category: 'normal' },
+    { id: 'g1_dex_half', name: 'Kanto Explorer', desc: 'Catch half of the Gen 1 Pokédex', icon: '📘', category: 'normal' },
+    { id: 'g1_shiny_10', name: 'Kanto Shiny Collector', desc: 'Catch 10 shiny Gen 1 Pokémon', icon: '✨', category: 'normal' },
+    { id: 'g1_nuz_3', name: 'Kanto Nuzlocke Veteran', desc: 'Beat Gen 1 in Nuzlocke 3 times', icon: '💀', category: 'gen1_nuz' },
+    { id: 'g2_wins_5', name: 'Johto Veteran', desc: 'Win Gen 2 5 times (without Nuzlocke)', icon: '🏆', category: 'gen2_norm' },
+    { id: 'g2_wins_25', name: 'Johto Legend', desc: 'Win Gen 2 25 times (without Nuzlocke)', icon: '👑', category: 'gen2_norm' },
+    { id: 'g2_dex_half', name: 'Johto Explorer', desc: 'Catch half of the Gen 2 Pokédex', icon: '📘', category: 'gen2_norm' },
+    { id: 'g2_shiny_10', name: 'Johto Shiny Collector', desc: 'Catch 10 shiny Gen 2 Pokémon', icon: '✨', category: 'gen2_norm' },
+    { id: 'g2_nuz_3', name: 'Johto Nuzlocke Veteran', desc: 'Beat Gen 2 in Nuzlocke 3 times', icon: '💀', category: 'gen2_nuz' },
+    { id: 'g3_wins_5', name: 'Hoenn Veteran', desc: 'Win Gen 3 5 times (without Nuzlocke)', icon: '🏆', category: 'gen3_norm' },
+    { id: 'g3_wins_25', name: 'Hoenn Legend', desc: 'Win Gen 3 25 times (without Nuzlocke)', icon: '👑', category: 'gen3_norm' },
+    { id: 'g3_dex_half', name: 'Hoenn Explorer', desc: 'Catch half of the Gen 3 Pokédex', icon: '📘', category: 'gen3_norm' },
+    { id: 'g3_shiny_10', name: 'Hoenn Shiny Collector', desc: 'Catch 10 shiny Gen 3 Pokémon', icon: '✨', category: 'gen3_norm' },
+    { id: 'g3_nuz_3', name: 'Hoenn Nuzlocke Veteran', desc: 'Beat Gen 3 in Nuzlocke 3 times', icon: '💀', category: 'gen3_nuz' },
+    { id: 'g4_wins_5', name: 'Sinnoh Veteran', desc: 'Win Gen 4 5 times (without Nuzlocke)', icon: '🏆', category: 'gen4_norm' },
+    { id: 'g4_wins_25', name: 'Sinnoh Legend', desc: 'Win Gen 4 25 times (without Nuzlocke)', icon: '👑', category: 'gen4_norm' },
+    { id: 'g4_dex_half', name: 'Sinnoh Explorer', desc: 'Catch half of the Gen 4 Pokédex', icon: '📘', category: 'gen4_norm' },
+    { id: 'g4_shiny_10', name: 'Sinnoh Shiny Collector', desc: 'Catch 10 shiny Gen 4 Pokémon', icon: '✨', category: 'gen4_norm' },
+    { id: 'g4_nuz_3', name: 'Sinnoh Nuzlocke Veteran', desc: 'Beat Gen 4 in Nuzlocke 3 times', icon: '💀', category: 'gen4_nuz' },
+    { id: 'g5_wins_5', name: 'Unova Veteran', desc: 'Win Gen 5 5 times (without Nuzlocke)', icon: '🏆', category: 'gen5_norm' },
+    { id: 'g5_wins_25', name: 'Unova Legend', desc: 'Win Gen 5 25 times (without Nuzlocke)', icon: '👑', category: 'gen5_norm' },
+    { id: 'g5_dex_half', name: 'Unova Explorer', desc: 'Catch half of the Gen 5 Pokédex', icon: '📘', category: 'gen5_norm' },
+    { id: 'g5_shiny_10', name: 'Unova Shiny Collector', desc: 'Catch 10 shiny Gen 5 Pokémon', icon: '✨', category: 'gen5_norm' },
+    { id: 'g5_nuz_3', name: 'Unova Nuzlocke Veteran', desc: 'Beat Gen 5 in Nuzlocke 3 times', icon: '💀', category: 'gen5_nuz' },
+    { id: 'g6_wins_5', name: 'Kalos Veteran', desc: 'Win Gen 6 5 times (without Nuzlocke)', icon: '🏆', category: 'gen6_norm' },
+    { id: 'g6_wins_25', name: 'Kalos Legend', desc: 'Win Gen 6 25 times (without Nuzlocke)', icon: '👑', category: 'gen6_norm' },
+    { id: 'g6_dex_half', name: 'Kalos Explorer', desc: 'Catch half of the Gen 6 Pokédex', icon: '📘', category: 'gen6_norm' },
+    { id: 'g6_shiny_10', name: 'Kalos Shiny Collector', desc: 'Catch 10 shiny Gen 6 Pokémon', icon: '✨', category: 'gen6_norm' },
+    { id: 'g6_nuz_3', name: 'Kalos Nuzlocke Veteran', desc: 'Beat Gen 6 in Nuzlocke 3 times', icon: '💀', category: 'gen6_nuz' },
+    { id: 'g7_wins_5', name: 'Alola Veteran', desc: 'Win Gen 7 5 times (without Nuzlocke)', icon: '🏆', category: 'gen7_norm' },
+    { id: 'g7_wins_25', name: 'Alola Legend', desc: 'Win Gen 7 25 times (without Nuzlocke)', icon: '👑', category: 'gen7_norm' },
+    { id: 'g7_dex_half', name: 'Alola Explorer', desc: 'Catch half of the Gen 7 Pokédex', icon: '📘', category: 'gen7_norm' },
+    { id: 'g7_shiny_10', name: 'Alola Shiny Collector', desc: 'Catch 10 shiny Gen 7 Pokémon', icon: '✨', category: 'gen7_norm' },
+    { id: 'g7_nuz_3', name: 'Alola Nuzlocke Veteran', desc: 'Beat Gen 7 in Nuzlocke 3 times', icon: '💀', category: 'gen7_nuz' },
+    { id: 'starters_stage_6', name: 'Sycamore\'s Challenge', desc: 'Win a Stage 6 run starting with Chespin, Fennekin, or Froakie', icon: '🧬', category: 'tower' },
+    { id: 'tower_clears_5', name: 'Tower Regular', desc: 'Clear 5 Battle Tower stages', icon: '🗼', category: 'tower' },
+    { id: 'tower_clears_25', name: 'Tower Veteran', desc: 'Clear 25 Battle Tower stages', icon: '🗼', category: 'tower' },
+    { id: 'tower_clears_100', name: 'Tower Master', desc: 'Clear 100 Battle Tower stages', icon: '🗼', category: 'tower' },
+    { id: 'tower_all_stages', name: 'Tower Conqueror', desc: 'Clear all 6 Battle Tower stages', icon: '🏯', category: 'tower' },
+    { id: 'tower_hc_1', name: 'Hardcore Climber', desc: 'Clear a stage of the Battle Tower in Hardcore', icon: '🔥', category: 'tower' },
+    { id: 'tower_hc_all', name: 'Hardcore Conqueror', desc: 'Clear all 6 Battle Tower stages in Hardcore', icon: '🔥', category: 'tower' },
+    { id: 'infinite_25', name: 'Infinite Climber', desc: 'Reach floor 25 in Infinite Mode', icon: '♾️', category: 'tower' },
+    { id: 'infinite_50', name: 'Infinite Explorer', desc: 'Reach floor 50 in Infinite Mode', icon: '♾️', category: 'tower' },
+    { id: 'infinite_100', name: 'Infinite Legend', desc: 'Reach floor 100 in Infinite Mode', icon: '♾️', category: 'tower' },
   ];
 
+  // The game's own list is a top-level const in its scripts: code running in
+  // the page reaches it by name, but it is not a window property
+  function getAchievementList() {
+    try {
+      if (typeof ACHIEVEMENTS !== 'undefined' && Array.isArray(ACHIEVEMENTS) && ACHIEVEMENTS.length) {
+        return ACHIEVEMENTS;
+      }
+    } catch {
+      // Not reachable from where this script runs
+    }
+    return BUILTIN_ACHIEVEMENTS;
+  }
+
   function renderAchievements(container) {
-    const unlocked = new Set(JSON.parse(localStorage.getItem('poke_achievements') || '[]'));
-
-    const categories = {
-      normal: ACHIEVEMENTS.filter(a => a.category === 'normal'),
-      tower: ACHIEVEMENTS.filter(a => a.category === 'tower'),
-      general: ACHIEVEMENTS.filter(a => a.category === 'general'),
-    };
-
-    const unlockedCount = unlocked.size;
-    const totalCount = ACHIEVEMENTS.length;
+    const list = getAchievementList();
+    const categories = [...ACHIEVEMENT_CATEGORIES];
+    for (const a of list) {
+      if (!categories.some(c => c.key === a.category)) {
+        categories.push({ key: a.category, label: a.category, group: 'general' });
+      }
+    }
 
     container.innerHTML = `
       <div style="margin-bottom: 20px; text-align: center;">
-        <div style="font-size: 24px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;">
-          ${unlockedCount} / ${totalCount}
-        </div>
+        <div style="font-size: 24px; font-weight: 600; color: rgba(139, 92, 246, 1); margin-bottom: 8px;" id="pse-ach-total"></div>
         <div style="font-size: 13px; color: rgba(235, 235, 245, 0.6);">Achievements Unlocked</div>
       </div>
-
-      <div style="margin-bottom: 24px;">
-        <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: rgba(235, 235, 245, 0.9);">🏆 Championship</div>
-        <div class="pse-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-          ${categories.normal.map(ach => renderAchievementCard(ach, unlocked.has(ach.id))).join('')}
-        </div>
+      <div class="pse-dex-toolbar">
+        <select class="pse-select" id="pse-ach-group">
+          ${ACHIEVEMENT_GROUPS.map(g => `<option value="${g.key}">${g.label}</option>`).join('')}
+        </select>
       </div>
-
-      <div style="margin-bottom: 24px;">
-        <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: rgba(235, 235, 245, 0.9);">🗼 Battle Tower</div>
-        <div class="pse-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-          ${categories.tower.map(ach => renderAchievementCard(ach, unlocked.has(ach.id))).join('')}
-        </div>
-      </div>
-
-      <div style="margin-bottom: 24px;">
-        <div style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: rgba(235, 235, 245, 0.9);">📚 General</div>
-        <div class="pse-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
-          ${categories.general.map(ach => renderAchievementCard(ach, unlocked.has(ach.id))).join('')}
-        </div>
-      </div>
+      <div id="pse-ach-sections"></div>
     `;
 
-    // Add click handlers
-    container.querySelectorAll('.pse-achievement-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const id = card.dataset.id;
-        const isUnlocked = unlocked.has(id);
+    const sections = document.getElementById('pse-ach-sections');
+    const groupSelect = document.getElementById('pse-ach-group');
+    groupSelect.value = localStorage.getItem('pse_ach_group') || 'all';
 
-        if (isUnlocked) {
-          unlocked.delete(id);
-        } else {
-          unlocked.add(id);
-        }
+    function saveUnlocked(unlocked) {
+      localStorage.setItem('poke_achievements', JSON.stringify([...unlocked]));
+      renderSections();
+    }
 
-        localStorage.setItem('poke_achievements', JSON.stringify([...unlocked]));
-        renderContent();
-      });
+    function renderSections() {
+      const unlocked = new Set(readJson('poke_achievements', []));
+      document.getElementById('pse-ach-total').textContent =
+        `${list.filter(a => unlocked.has(a.id)).length} / ${list.length}`;
+
+      sections.innerHTML = categories
+        .filter(c => groupSelect.value === 'all' || c.group === groupSelect.value)
+        .map(c => {
+          const items = list.filter(a => a.category === c.key);
+          if (items.length === 0) return '';
+          const done = items.filter(a => unlocked.has(a.id)).length;
+          return `
+            <div class="pse-ach-section" data-category="${c.key}">
+              <div class="pse-gen-header">
+                <div class="pse-ach-title">${c.label} <span class="pse-gen-count">${done}/${items.length}</span></div>
+                <button class="pse-btn pse-btn-secondary pse-ach-unlock-all">Unlock all</button>
+                <button class="pse-btn pse-btn-danger pse-ach-lock-all">Lock all</button>
+              </div>
+              <div class="pse-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+                ${items.map(a => renderAchievementCard(a, unlocked.has(a.id))).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+    }
+
+    sections.addEventListener('click', e => {
+      const section = e.target.closest('.pse-ach-section');
+      if (!section) return;
+      const category = categories.find(c => c.key === section.dataset.category);
+      const ids = list.filter(a => a.category === category.key).map(a => a.id);
+      const unlocked = new Set(readJson('poke_achievements', []));
+
+      const card = e.target.closest('.pse-achievement-card');
+      if (card) {
+        if (unlocked.has(card.dataset.id)) unlocked.delete(card.dataset.id);
+        else unlocked.add(card.dataset.id);
+        saveUnlocked(unlocked);
+      } else if (e.target.closest('.pse-ach-unlock-all')) {
+        ids.forEach(id => unlocked.add(id));
+        saveUnlocked(unlocked);
+      } else if (e.target.closest('.pse-ach-lock-all')) {
+        if (!confirm(`Lock every achievement in "${category.label}"?`)) return;
+        ids.forEach(id => unlocked.delete(id));
+        saveUnlocked(unlocked);
+      }
     });
+
+    groupSelect.addEventListener('change', () => {
+      localStorage.setItem('pse_ach_group', groupSelect.value);
+      renderSections();
+    });
+
+    renderSections();
   }
 
   function renderAchievementCard(achievement, isUnlocked) {

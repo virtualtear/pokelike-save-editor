@@ -30,7 +30,7 @@ The tabs at the top of the editor:
 - **Shiny Dex:** works the same way, for shiny Pokémon.
 - **Hall of Fame:** your finished runs, newest first. Click a run to edit it, or click "+ Add New Run" to make a new one. You can pick Championship or Battle Tower (with a region), turn Nuzlocke on or off, and add up to 6 Pokémon. Click a Pokémon in the team to change its nickname, level, shiny status or held item. "Delete" removes the run for good.
 - **Stat Buffs:** lists the Pokémon from your Hall of Fame. Click one to give it buffs. Each stat can get 0 to 10 buffs, and each buff adds 10%. Buffs count for the whole evolution line, so buffing Charmander also buffs Charizard. You start with 10 points and get 10 more for every Battle Tower stage you have cleared, up to 50. "Cheat Mode" removes that limit. The "Battle Tower only" box hides legendary Pokémon from the list.
-- **Achievements:** click an achievement to unlock it. Click it again to lock it.
+- **Achievements:** every achievement from the game, grouped the same way as in the game. Click an achievement to unlock it, and click it again to lock it. "Unlock all" and "Lock all" do the same for a whole group. The dropdown shows one region at a time.
 - **Settings:** change your Elite Wins, Win Streak and whether your last run was won. Click "Save Settings" when you are done.
 
 When you have finished editing, click **Save & Reload** at the top of the editor. The page reloads and the game picks up your changes.
