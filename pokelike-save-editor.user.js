@@ -707,6 +707,8 @@
     }
     #pse-root .pse-split-list .pse-scroll { padding: 0 16px 20px 28px; }
     #pse-root .pse-list-head { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 14px 28px; }
+    /* The column layout would turn the toolbar's 220px flex-basis into a height */
+    #pse-root .pse-list-head .pse-search { flex: none; }
     #pse-root .pse-split-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 28px 32px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
     #pse-root .pse-list { display: flex; flex-direction: column; gap: 4px; list-style: none; }
 
@@ -2774,6 +2776,8 @@
   }
 
   let buffSelected = null;
+  // Kept outside the view, since picking a card renders the whole view again
+  let buffQuery = '';
 
   // Buffs count for a whole evolution line, so each line shows up once, as its base
   // form. The value is true when any member of the line was shiny
@@ -2807,6 +2811,9 @@
     const lines = hallOfFameLines(hideLegendaries);
     const ids = [...lines.keys()];
     const buffedFirst = [...ids.filter(id => statBuffs[id]), ...ids.filter(id => !statBuffs[id])];
+    // Search matches every member of a line, so "Charizard" finds the Charmander card
+    const lineMembers = new Map(ids.map(id => [id, []]));
+    for (const pokemon of POKEMON_LIST) lineMembers.get(getEvoLineRoot(pokemon.id))?.push(pokemon);
 
     if (buffSelected !== null && !lines.has(buffSelected)) buffSelected = null;
     if (buffSelected === null && buffedFirst.length && !isNarrow()) buffSelected = buffedFirst[0];
@@ -2828,26 +2835,60 @@
       <div class="pse-split${buffSelected !== null ? ' has-detail' : ''}">
         <div class="pse-split-list">
           <div class="pse-list-head">
+            ${ids.length ? searchField('pse-buff-search', 'Search by name or number', 'Search Pokémon') : ''}
             <label class="pse-switch">
               <input type="checkbox" role="switch" id="pse-filter-legendaries" ${hideLegendaries ? 'checked' : ''}>
               <span class="pse-switch-text">Battle Tower only<span class="pse-switch-hint">Hides legendary Pokémon</span></span>
             </label>
           </div>
-          <div class="pse-scroll">
-            ${buffedFirst.length
-              ? `<div class="pse-lines">${buffedFirst.map(id => lineCardHtml(id, lines.get(id), statBuffs[id])).join('')}</div>`
-              : emptyState}
-          </div>
+          <div class="pse-scroll"></div>
         </div>
         <div class="pse-split-detail" id="pse-buff-detail"></div>
       </div>
     `;
 
+    const scroll = container.querySelector('.pse-split-list .pse-scroll');
+    const search = container.querySelector('#pse-buff-search');
+
+    function renderLines() {
+      // Without a search field (no lines at all) a leftover query must not hide the empty state
+      const query = search ? buffQuery.trim() : '';
+      const shown = query ? buffedFirst.filter(id => lineMembers.get(id).some(p => matchesSearch(p, query))) : buffedFirst;
+      if (shown.length) {
+        scroll.innerHTML = `<div class="pse-lines">${shown.map(id => lineCardHtml(id, lines.get(id), statBuffs[id])).join('')}</div>`;
+      } else if (query) {
+        scroll.innerHTML = `
+          <div class="pse-state">
+            <h3 class="pse-state-title">No Pokémon match “${escapeHtml(query)}”</h3>
+            <p>Search works with any Pokémon of a line, by English name, the name shown in the game, or a Pokédex number like 25.</p>
+            <button type="button" class="pse-btn pse-btn-ghost" data-act="clear-search">Clear search</button>
+          </div>
+        `;
+      } else {
+        scroll.innerHTML = emptyState;
+      }
+    }
+
+    if (search) {
+      search.value = buffQuery;
+      bindSearch(search, () => {
+        buffQuery = search.value;
+        renderLines();
+      });
+    }
+    renderLines();
+
     container.querySelector('#pse-filter-legendaries').addEventListener('change', e => {
       localStorage.setItem('pse_filter_legendaries', e.target.checked);
       renderStatBuffs(container);
     });
-    container.querySelector('.pse-split-list .pse-scroll').addEventListener('click', e => {
+    scroll.addEventListener('click', e => {
+      if (e.target.closest('[data-act="clear-search"]')) {
+        search.value = '';
+        search.dispatchEvent(new Event('input'));
+        search.focus();
+        return;
+      }
       const card = e.target.closest('.pse-line');
       if (!card) return;
       buffSelected = Number(card.dataset.id);
