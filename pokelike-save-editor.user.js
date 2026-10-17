@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Pokelike Save Editor
 // @namespace    https://github.com/virtualtear/pokelike-save-editor
-// @version      3.0.0
+// @version      3.1.0
 // @description  Save editor for Pokelike. Originally made by neol1no, continued by virtualtear.
 // @author       neol1no (original), virtualtear (continued)
 // @homepageURL  https://github.com/virtualtear/pokelike-save-editor
@@ -711,6 +711,7 @@
     #pse-root .pse-list-head .pse-search { flex: none; }
     #pse-root .pse-split-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 28px 32px; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
     #pse-root .pse-list { display: flex; flex-direction: column; gap: 4px; list-style: none; }
+    #pse-root .pse-split-list .pse-section-head .pse-count { margin-left: auto; }
 
     #pse-root .pse-run {
       display: flex; flex-direction: column; gap: 6px; width: 100%;
@@ -729,7 +730,6 @@
       background: var(--surface-3); color: var(--text-2);
       font-size: 11px; font-weight: 700; white-space: nowrap;
     }
-    #pse-root .pse-tag-tower { background: rgba(74, 140, 240, 0.16); color: #9cc2ff; }
     #pse-root .pse-tag-nuz { background: rgba(240, 86, 75, 0.15); color: #ff9e95; }
     #pse-root .pse-run-team { display: flex; gap: 2px; min-height: 36px; }
     #pse-root .pse-run-team img { width: 36px; height: 36px; image-rendering: pixelated; }
@@ -1103,7 +1103,7 @@
     try {
       return GM_info.script.version;
     } catch {
-      return '3.0.0';
+      return '3.1.0';
     }
   })();
 
@@ -2084,15 +2084,28 @@
 
   const runDifficulty = run => (run.hardcore ? 'hardcore' : run.easyMode ? 'easy' : 'normal');
 
-  function runModeTags(run) {
-    const tags = run.endless
-      ? [`<span class="pse-tag pse-tag-tower">Battle Tower · ${TOWER_REGIONS[(run.stageNumber || 1) - 1] || 'Unknown'}</span>`]
-      : [`<span class="pse-tag">Championship · ${CHAMPIONSHIP_REGIONS.find(r => r.key === runRegion(run)).label}</span>`];
+  // The run list is grouped by mode and region. Groups follow the order of the
+  // detail view's pickers: every Championship region first, then the Tower stages
+  function runGroup(run) {
+    if (!run.endless) {
+      const region = runRegion(run);
+      const order = CHAMPIONSHIP_REGIONS.findIndex(r => r.key === region);
+      return { key: `championship-${region}`, mode: 'Championship', region: CHAMPIONSHIP_REGIONS[order].label, order };
+    }
+    const stage = run.stageNumber || 1;
+    return { key: `tower-${stage}`, mode: 'Battle Tower', region: TOWER_REGIONS[stage - 1] || 'Unknown', order: CHAMPIONSHIP_REGIONS.length + stage };
+  }
+
+  // Mode and region are the group heading, so a row only tags the rules
+  function runRuleTags(run) {
+    const tags = [];
     if (run.hardMode) tags.push('<span class="pse-tag pse-tag-nuz">Nuzlocke</span>');
     if (run.hardcore) tags.push('<span class="pse-tag pse-tag-nuz">Hardcore</span>');
     else if (run.easyMode) tags.push('<span class="pse-tag">Easy</span>');
     return tags.join('');
   }
+
+  const HOF_COLLAPSED_KEY = 'pse_hof_collapsed_groups';
 
   let hofSelected = null;
   // What the panel under the team shows: { type: 'member', teamIdx } or { type: 'picker' }
@@ -2105,7 +2118,7 @@
       hofPanel = null;
     }
     if (hofSelected === null && hof.length && !isNarrow()) hofSelected = hof.length - 1;
-    setHeadline(hof.length, `${hof.length === 1 ? 'finished run' : 'finished runs'}, newest first`);
+    setHeadline(hof.length, `${hof.length === 1 ? 'finished run' : 'finished runs'} by mode and region, newest first`);
 
     container.innerHTML = `
       <div class="pse-split${hofSelected !== null ? ' has-detail' : ''}">
@@ -2113,27 +2126,29 @@
           <div class="pse-list-head">
             <button type="button" class="pse-btn pse-btn-primary" data-act="new-run">${icon('plus')}New run</button>
           </div>
-          <div class="pse-scroll">
-            ${hof.length ? `
-              <ul class="pse-list" aria-label="Runs">
-                ${hof.map((run, idx) => `<li>${runRowHtml(run, idx)}</li>`).reverse().join('')}
-              </ul>
-            ` : `
-              <div class="pse-state">
-                <h3 class="pse-state-title">No finished runs</h3>
-                <p>Runs show up here when you beat the game. You can also add one yourself.</p>
-              </div>
-            `}
-          </div>
+          <div class="pse-scroll"></div>
         </div>
         <div class="pse-split-detail" id="pse-run-detail"></div>
       </div>
     `;
+    renderRunList(container);
 
     const list = container.querySelector('.pse-split-list');
     list.addEventListener('click', e => {
       if (e.target.closest('[data-act="new-run"]')) {
         addNewHofRun(container);
+        return;
+      }
+      const collapse = e.target.closest('[data-act="collapse"]');
+      if (collapse) {
+        const section = collapse.closest('.pse-section');
+        const collapsed = new Set(readJson(HOF_COLLAPSED_KEY, []));
+        const open = collapsed.has(section.dataset.group);
+        if (open) collapsed.delete(section.dataset.group);
+        else collapsed.add(section.dataset.group);
+        writeJson(HOF_COLLAPSED_KEY, [...collapsed]);
+        section.classList.toggle('collapsed', !open);
+        collapse.setAttribute('aria-expanded', String(open));
         return;
       }
       const row = e.target.closest('.pse-run');
@@ -2147,14 +2162,54 @@
     renderRunDetail(container);
   }
 
+  function renderRunList(container) {
+    const scroll = container.querySelector('.pse-split-list .pse-scroll');
+    const hof = readJson(HOF_KEY, []);
+    if (!hof.length) {
+      scroll.innerHTML = `
+        <div class="pse-state">
+          <h3 class="pse-state-title">No finished runs</h3>
+          <p>Runs show up here when you beat the game. You can also add one yourself.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const groups = new Map();
+    hof.forEach((run, idx) => {
+      const group = runGroup(run);
+      if (!groups.has(group.key)) groups.set(group.key, { ...group, idxs: [] });
+      groups.get(group.key).idxs.push(idx);
+    });
+    const collapsed = new Set(readJson(HOF_COLLAPSED_KEY, []));
+
+    scroll.innerHTML = [...groups.values()].sort((a, b) => a.order - b.order).map(g => {
+      const open = !collapsed.has(g.key);
+      return `
+        <section class="pse-section${open ? '' : ' collapsed'}" data-group="${g.key}" aria-labelledby="pse-runs-title-${g.key}">
+          <header class="pse-section-head">
+            <button type="button" class="pse-collapse" data-act="collapse" aria-expanded="${open}" aria-controls="pse-runs-${g.key}">
+              ${icon('chevron')}<span id="pse-runs-title-${g.key}">${g.mode} <span class="pse-dim">${escapeHtml(g.region)}</span></span>
+            </button>
+            <span class="pse-count">${plural(g.idxs.length, 'run')}</span>
+          </header>
+          <ul class="pse-list pse-section-body" id="pse-runs-${g.key}">
+            ${g.idxs.map(idx => `<li>${runRowHtml(hof[idx], idx)}</li>`).reverse().join('')}
+          </ul>
+        </section>
+      `;
+    }).join('');
+  }
+
   function runRowHtml(run, idx) {
+    const tags = runRuleTags(run);
     return `
       <button type="button" class="pse-run" data-idx="${idx}" aria-current="${idx === hofSelected}">
         <span class="pse-run-top">
           <span class="pse-run-name">Run #${run.runNumber}</span>
           <span class="pse-run-date">${escapeHtml(run.date)}</span>
         </span>
-        <span class="pse-run-mode">${runModeTags(run)}</span>
+        ${tags ? `<span class="pse-run-mode">${tags}</span>` : ''}
         <span class="pse-run-team">
           ${run.team.length
             ? run.team.map(m => `<img src="${teamSpriteUrl(m)}" alt="" width="36" height="36" loading="lazy">`).join('')
@@ -2169,7 +2224,17 @@
   function refreshRunRow(container, idx) {
     const row = container.querySelector(`.pse-run[data-idx="${idx}"]`);
     const run = readJson(HOF_KEY, [])[idx];
-    if (row && run) row.outerHTML = runRowHtml(run, idx);
+    if (!row || !run) return;
+    const group = runGroup(run).key;
+    if (row.closest('.pse-section').dataset.group === group) {
+      row.outerHTML = runRowHtml(run, idx);
+      return;
+    }
+    // A new mode or region moves the run to another group, which opens so the run stays in view
+    const collapsed = readJson(HOF_COLLAPSED_KEY, []);
+    if (collapsed.includes(group)) writeJson(HOF_COLLAPSED_KEY, collapsed.filter(key => key !== group));
+    renderRunList(container);
+    container.querySelector(`.pse-run[data-idx="${idx}"]`)?.scrollIntoView({ block: 'nearest' });
   }
 
   // Reads the save, lets fn change one run, and writes it back
